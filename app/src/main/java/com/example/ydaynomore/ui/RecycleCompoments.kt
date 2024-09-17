@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -22,7 +26,7 @@ import com.example.ydaynomore.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecycleScreen() {
+fun RecycleScreen(onBackButtonClicked: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -30,6 +34,14 @@ fun RecycleScreen() {
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
+                navigationIcon = {
+                    IconButton(onClick = { onBackButtonClicked() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Localized description"
+                        )
+                    }
+                },
                 title = {
                     Text("Recycle")
                 }
@@ -71,5 +83,5 @@ fun RecycleContent(modifier: Modifier) {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun RecycleScreenPreview() {
-    RecycleScreen()
+    RecycleScreen(onBackButtonClicked = {})
 }
