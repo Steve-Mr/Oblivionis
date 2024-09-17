@@ -27,22 +27,35 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.example.ydaynomore.R
+import com.example.ydaynomore.viewModel.ActionViewModel
 import kotlin.math.absoluteValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.bumptech.glide.integration.compose.GlideImage
+import org.jetbrains.annotations.Async
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalGlideComposeApi::class)
 @Composable
-fun ActionScreen(onNextButtonClicked: () -> Unit, onBackButtonClicked: () -> Unit) {
+fun ActionScreen(
+    viewModel: ActionViewModel = viewModel(),
+    onNextButtonClicked: () -> Unit,
+    onBackButtonClicked: () -> Unit) {
+    viewModel.loadImages()
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -81,25 +94,20 @@ fun ActionScreen(onNextButtonClicked: () -> Unit, onBackButtonClicked: () -> Uni
                 scrollBehavior = scrollBehavior,
             )
         },
-
         bottomBar = { ActionRow() }
+
     ) { innerPadding ->
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            val pagerState = rememberPagerState(pageCount = {
-                10
-            })
+            val images = viewModel.images.collectAsState(initial = emptyList()).value
+            val pagerState = rememberPagerState(pageCount = { images.size })
+
             HorizontalPager(
+                modifier = Modifier.padding(innerPadding),
                 state = pagerState,
-                modifier = Modifier.padding(top = 16.dp),
                 contentPadding = PaddingValues(horizontal = 64.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 pageSpacing = 16.dp
-            ) { photo ->
+            ) { page ->
                 Card(
                     Modifier
                         .graphicsLayer {
@@ -107,9 +115,8 @@ fun ActionScreen(onNextButtonClicked: () -> Unit, onBackButtonClicked: () -> Uni
                             // scroll position. We use the absolute value which allows us to mirror
                             // any effects for both directions
                             val pageOffset = (
-                                    (pagerState.currentPage - photo) +
-                                            pagerState
-                                                .currentPageOffsetFraction
+                                    (pagerState.currentPage - page)
+                                            + pagerState.currentPageOffsetFraction
                                     ).absoluteValue
 
                             // We animate the alpha, between 50% and 100%
@@ -119,35 +126,24 @@ fun ActionScreen(onNextButtonClicked: () -> Unit, onBackButtonClicked: () -> Uni
                                 fraction = 1f - pageOffset.coerceIn(0f, 1f)
                             )
                         }
+                        .padding(top = 16.dp)
                 ) {
-                    // Card content
-                    if (photo % 3 == 1) {
-                        Image(
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)),
-                            alignment = Alignment.Center,
-                            painter = painterResource(id = R.drawable.test),
-                            contentDescription = ""
-                        )
-                    } else if (photo % 3 == 2) {
-                        Image(
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)),
-                            alignment = Alignment.Center,
-                            painter = painterResource(id = R.drawable.test1),
-                            contentDescription = ""
-                        )
-                    } else {
-                        Image(
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)),
-                            alignment = Alignment.Center,
-                            painter = painterResource(id = R.drawable.test2),
-                            contentDescription = ""
-                        )
-                    }
-                }
+//                    AsyncImage(
+//                        modifier = Modifier.clip(RoundedCornerShape(8.dp)),
+//                        alignment = Alignment.Center,
+//                        model = images[page].contentUri, contentDescription = "")
 
+                    GlideImage(model = images[page].contentUri, contentDescription = "")
+
+//                    AsyncImage(
+//                        modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+//                        alignment = Alignment.Center,
+//                        model = R.drawable.test2,
+//                        contentDescription = ""
+//                    )
+                }
             }
         }
-    }
 }
 
 @Composable

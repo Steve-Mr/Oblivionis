@@ -69,4 +69,14 @@ dependencies {
 
     implementation(libs.accompanist.permissions)
     implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.coil)
+    implementation(libs.coil.compose)
+
+    implementation(libs.glide)
+    implementation(libs.compose)
+
 }
