@@ -1,5 +1,6 @@
 package com.example.ydaynomore.ui
 
+import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,16 +45,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
+import com.example.ydaynomore.YNMScreen
 import com.example.ydaynomore.viewModel.ActionViewModel
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import kotlin.math.absoluteValue
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun ActionScreen(
     viewModel: ActionViewModel = viewModel(),
     onNextButtonClicked: () -> Unit,
-    onBackButtonClicked: () -> Unit
+    onBackButtonClicked: () -> Unit,
 ) {
 
     val images = viewModel.images.collectAsState(initial = emptyList())
@@ -203,5 +210,5 @@ fun ActionRow(
 @Composable
 fun PreviewActionRow() {
 //    ActionRow()
-    ActionScreen(onNextButtonClicked = {}, onBackButtonClicked = {})
+//    ActionScreen(onNextButtonClicked = {}, onBackButtonClicked = {})
 }

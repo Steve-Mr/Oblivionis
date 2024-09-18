@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.ydaynomore"
-        minSdk = 30
+        minSdk = 31
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -76,7 +76,9 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.coil.compose)
 
-    implementation(libs.glide)
-    implementation(libs.compose)
+//    implementation(libs.glide)
+//    implementation(libs.compose)
+
+    implementation(libs.accompanist.permissions)
 
 }
