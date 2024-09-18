@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.MediaStore.Audio.Media
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.AndroidViewModel
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit
 
 class ActionViewModel(application: Application): AndroidViewModel(application) {
     private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
+    private val _lastImages = _images
 //    val images: LiveData<List<MediaStoreImage>> get() = _images
     val images: Flow<List<MediaStoreImage>> = _images.asStateFlow()
 
@@ -73,6 +75,24 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
             pendingDeleteImage = null
             deleteImage(image)
         }
+    }
+
+    fun markImageDelete(pos: Int) {
+//        val updatedList = _images.value.toMutableList().apply {
+//            remove(image)
+//        }
+
+        val updatedList = _images.value.toMutableList().apply {
+            removeAt(pos)
+        }
+        // 更新图片列表
+        _images.value = updatedList
+
+        /* TODO */
+    }
+
+    fun unMarkImageDelete(place: Int) {
+        /* TODO */
     }
 
     suspend fun queryImages(): List<MediaStoreImage> {
@@ -363,11 +383,11 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
 
                     val image = MediaStoreImage(id, displayName, dateModified, contentUri, width = width, height = height)
 
-                    Log.v("WLAP", "$width $height")
+//                    Log.v("WLAP", "$width $height")
                     images += image
 
                     // For debugging, we'll output the image objects we create to logcat.
-                    Log.v(TAG, "Added image: $image")
+//                    Log.v(TAG, "Added image: $image")
                 }
             }
         }
@@ -376,7 +396,6 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         return images
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
     private suspend fun performDeleteImage(image: MediaStoreImage) {
         withContext(Dispatchers.IO) {
             try {
@@ -446,6 +465,10 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         contentObserver?.let {
             getApplication<Application>().contentResolver.unregisterContentObserver(it)
         }
+    }
+
+    init {
+        loadImages()
     }
 }
 
