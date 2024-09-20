@@ -65,11 +65,15 @@ fun ActionScreen(
 
     val lastMarked = viewModel.lastMarked.collectAsState()
 
-    LaunchedEffect(images) {
-        // 当 images 更新时触发
-        Log.d("Compose", "Images updated: ${images.value.size}")
-    }
+    val marked = recycleViewModel.allMarked.collectAsState(initial = emptyList())
 
+    if (marked.value.isNotEmpty()) {
+
+        LaunchedEffect(marked) {
+            viewModel.markList(marked.value)
+            Log.v("YDNM", "LAUNCHED EFFECT ${marked.value.size}")
+        }
+    }
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())

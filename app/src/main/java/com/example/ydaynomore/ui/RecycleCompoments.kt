@@ -1,5 +1,6 @@
 package com.example.ydaynomore.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
@@ -40,6 +42,10 @@ fun RecycleScreen(
     onBackButtonClicked: () -> Unit) {
 
     val images = recycleViewModel.allMarked.collectAsState(initial = emptyList())
+
+    LaunchedEffect(images) {
+        Log.v("YDNM", "RECYCLE EFFECT ${images.value.size}")
+    }
 
     Scaffold(
         topBar = {
@@ -81,6 +87,7 @@ fun RecycleScreen(
             verticalItemSpacing = 4.dp,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
+                Log.v("YDNM", "RECYCLE ${images.value.size}")
                 items(images.value.size) { index ->
                     ActionImage(modifier = Modifier
                         .fillMaxWidth(fraction = 0.5f),
