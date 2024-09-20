@@ -1,4 +1,4 @@
-package com.example.ydaynomore.viewModel
+package com.example.ydaynomore.viewmodel
 
 import android.app.Application
 import android.app.RecoverableSecurityException
@@ -13,21 +13,18 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.provider.MediaStore.Audio.Media
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import com.example.ydaynomore.data.MediaStoreImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
@@ -35,9 +32,13 @@ import java.util.concurrent.TimeUnit
 
 class ActionViewModel(application: Application): AndroidViewModel(application) {
     private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
-    private val _lastImages = _images
-//    val images: LiveData<List<MediaStoreImage>> get() = _images
-    val images: Flow<List<MediaStoreImage>> = _images.asStateFlow()
+
+    val unmarkedImages : Flow<List<MediaStoreImage>> = _images.map {
+        images -> images.filter { !it.isMarked }
+    }
+
+    private val _lastMarked = MutableStateFlow<MediaStoreImage?>(null)
+    val lastMarked = _lastMarked.asStateFlow()
 
     private var contentObserver: ContentObserver? = null
 
@@ -64,6 +65,14 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
+    fun deleteImages(images: List<MediaStoreImage>) {
+        viewModelScope.launch {
+            images.forEach {
+                performDeleteImage(it)
+            }
+        }
+    }
+
     fun deleteImage(image: MediaStoreImage) {
         viewModelScope.launch {
             performDeleteImage(image)
@@ -77,23 +86,58 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    fun markImageDelete(pos: Int) {
-//        val updatedList = _images.value.toMutableList().apply {
-//            remove(image)
-//        }
+    fun markImage(index: Int) {
 
-        val updatedList = _images.value.toMutableList().apply {
-            removeAt(pos)
+        val unmarkedImageList = _images.value.filter {
+            !it.isMarked
         }
-        // 更新图片列表
-        _images.value = updatedList
 
-        /* TODO */
+        // 获取要标记的图片
+        val target = unmarkedImageList[index]
+        _lastMarked.value = target.copy(isMarked = true)
+
+        // 复制原始图片列表并找到要标记的图片的索引
+        val updatedList = _images.value.toMutableList()
+        val newIndex = updatedList.indexOf(target)
+
+        // 确保找到图片并且不为空
+        if (newIndex != -1) {
+            // 标记图片
+            updatedList[newIndex] = target.copy(isMarked = true)
+
+            // 更新 _images 列表，Flow 会自动更新
+            _images.value = updatedList
+        }
+
     }
 
-    fun unMarkImageDelete(place: Int) {
-        /* TODO */
+    fun unMarkLastImage(): Long? {
+        // 检查 lastMarkedImage 是否为空
+        _lastMarked.value?.let { img ->
+            // 创建一个更新后的 _images 列表
+            val updatedList = _images.value.toMutableList()
+
+            // 找到 lastMarkedImage 的索引
+            val index = updatedList.indexOf(img)
+
+            // 确保图片在列表中存在
+            if (index != -1) {
+                // 更新 isMarked 状态为 false
+                updatedList[index] = img.copy(isMarked = false)
+
+                // 更新 _images 的值
+                _images.value = updatedList
+
+                // 清空 lastMarkedImage
+                _lastMarked.value = null
+
+                // 返回图片的 id
+                return img.id
+            }
+        }
+        return null
     }
+
 
     suspend fun queryImages(): List<MediaStoreImage> {
         val images = mutableListOf<MediaStoreImage>()
@@ -324,8 +368,6 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
                     val dateModified =
                         Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateModifiedColumn)))
                     val displayName = cursor.getString(displayNameColumn)
-                    val width = cursor.getInt(widthColumn)
-                    val height = cursor.getInt(heightColumn)
 
                     /**
                      * This is one of the trickiest parts:
@@ -381,13 +423,9 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
                         id
                     )
 
-                    val image = MediaStoreImage(id, displayName, dateModified, contentUri, width = width, height = height)
+                    val image = MediaStoreImage(id, displayName, dateModified, contentUri)
 
-//                    Log.v("WLAP", "$width $height")
                     images += image
-
-                    // For debugging, we'll output the image objects we create to logcat.
-//                    Log.v(TAG, "Added image: $image")
                 }
             }
         }

@@ -18,14 +18,29 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.ydaynomore.R
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ydaynomore.YNMApplication
+import com.example.ydaynomore.data.MediaStoreImage
+import com.example.ydaynomore.viewmodel.ActionViewModel
+import com.example.ydaynomore.viewmodel.RecycleViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecycleScreen(onBackButtonClicked: () -> Unit) {
+fun RecycleScreen(
+    recycleViewModel: RecycleViewModel = viewModel(
+        factory = RecycleViewModel.Factory
+    ),
+    actionViewModel: ActionViewModel = viewModel(),
+    onBackButtonClicked: () -> Unit) {
+
+    val images = recycleViewModel.allMarked.collectAsState(initial = emptyList())
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -47,36 +62,48 @@ fun RecycleScreen(onBackButtonClicked: () -> Unit) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { /*TODO*/ }) {
+            FloatingActionButton(onClick = {
+                actionViewModel.deleteImages(images.value)
+                recycleViewModel.removeAll()
+            }) {
                 
             }
         }
     ) { innerPadding ->
-        RecycleContent(modifier = Modifier.padding(innerPadding))
+//        RecycleContent(
+//            modifier = Modifier.padding(innerPadding),
+//            images = images,
+//            onImageClick = {
+//                recycleViewModel.unMark(im)
+//            })
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Fixed(2),
+            verticalItemSpacing = 4.dp,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            content = {
+                items(images.value.size) { index ->
+                    ActionImage(modifier = Modifier
+                        .fillMaxWidth(fraction = 0.5f),
+                        uri = images.value[index].contentUri,
+                        onClick = {
+                            recycleViewModel.unMark(images.value[index])
+                        })
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        )
     }
 }
 
 @Composable
-fun RecycleContent(modifier: Modifier) {
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Fixed(2),
-        verticalItemSpacing = 4.dp,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        content = {
-            items(10) { photo ->
-                if (photo % 2 == 1) {
-                    ActionImage(modifier = Modifier
-                        .fillMaxWidth(fraction = 0.5f), R.drawable.test1)
-                } else {
-                    ActionImage(modifier = Modifier
-                        .fillMaxWidth(fraction = 0.5f), R.drawable.test2)
-                }
-            }
-        },
-        modifier = modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    )
+fun RecycleContent(
+    modifier: Modifier,
+    images: State<List<MediaStoreImage>>,
+    onImageClick: () -> Unit
+) {
+
 }
 
 @Preview(showBackground = true, showSystemUi = true)
