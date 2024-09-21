@@ -13,6 +13,8 @@ import com.example.ydaynomore.data.MediaStoreImage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
+
+/* TODO: database only use for persistence not compose */
 class RecycleViewModel(private val imageRepository: ImageRepository): ViewModel() {
     val allMarked: Flow<List<MediaStoreImage>> = imageRepository.allMarks
 

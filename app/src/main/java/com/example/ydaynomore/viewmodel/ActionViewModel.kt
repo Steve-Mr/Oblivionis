@@ -2,14 +2,11 @@ package com.example.ydaynomore.viewmodel
 
 import android.app.Application
 import android.app.RecoverableSecurityException
-import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.IntentSender
 import android.database.ContentObserver
-import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -24,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
@@ -33,8 +29,11 @@ import java.util.concurrent.TimeUnit
 class ActionViewModel(application: Application): AndroidViewModel(application) {
     private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
 
-    val unmarkedImages : Flow<List<MediaStoreImage>> = _images.map {
-        images -> images.filter { !it.isMarked }
+    val markedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
+        images.filter { it.isMarked }
+    }
+    val unmarkedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
+        images.filter { !it.isMarked }
     }
 
     private val _lastMarked = MutableStateFlow<MediaStoreImage?>(null)
@@ -109,6 +108,12 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
             _images.value = updatedList
         }
 
+        val markedImageList = _images.value.filter {
+            it.isMarked
+        }
+
+        Log.v("YDNM", "MARKED ${markedImageList.size}")
+
     }
 
     fun unMarkLastImage(): Long? {
@@ -138,11 +143,20 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         return null
     }
 
-    fun markList(listToMark: List<MediaStoreImage>) {
+    fun unMarkImage(target: MediaStoreImage) {
+        val updatedList = _images.value.toMutableList()
+        updatedList[updatedList.indexOf(target.copy(isMarked = true))] = target.copy(isMarked = false)
+        if (target == _lastMarked.value) {
+            _lastMarked.value = null
+        }
+        _images.value = updatedList
+    }
+
+    fun restoreMarkList(listToMark: List<MediaStoreImage>) {
         val updatedList = _images.value.toMutableList()
 
-        listToMark.forEach { target ->
-            updatedList[updatedList.indexOf(target.copy(isMarked = false))] = target.copy(isMarked = true)
+        updatedList.forEach { item ->
+            updatedList[updatedList.indexOf(item)] = item.copy(isMarked = item in listToMark)
         }
         _images.value = updatedList
 
@@ -246,6 +260,7 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
 
     init {
         loadImages()
+        Log.v("YDNM", "VIEWMODEL INIT")
     }
 }
 

@@ -41,7 +41,7 @@ fun RecycleScreen(
     actionViewModel: ActionViewModel = viewModel(),
     onBackButtonClicked: () -> Unit) {
 
-    val images = recycleViewModel.allMarked.collectAsState(initial = emptyList())
+    val images = actionViewModel.markedImages.collectAsState(initial = emptyList())
 
     LaunchedEffect(images) {
         Log.v("YDNM", "RECYCLE EFFECT ${images.value.size}")
@@ -76,12 +76,6 @@ fun RecycleScreen(
             }
         }
     ) { innerPadding ->
-//        RecycleContent(
-//            modifier = Modifier.padding(innerPadding),
-//            images = images,
-//            onImageClick = {
-//                recycleViewModel.unMark(im)
-//            })
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(2),
             verticalItemSpacing = 4.dp,
@@ -93,7 +87,7 @@ fun RecycleScreen(
                         .fillMaxWidth(fraction = 0.5f),
                         uri = images.value[index].contentUri,
                         onClick = {
-                            recycleViewModel.unMark(images.value[index])
+                            actionViewModel.unMarkImage(images.value[index])
                         })
                 }
             },
@@ -102,15 +96,6 @@ fun RecycleScreen(
                 .padding(innerPadding)
         )
     }
-}
-
-@Composable
-fun RecycleContent(
-    modifier: Modifier,
-    images: State<List<MediaStoreImage>>,
-    onImageClick: () -> Unit
-) {
-
 }
 
 @Preview(showBackground = true, showSystemUi = true)

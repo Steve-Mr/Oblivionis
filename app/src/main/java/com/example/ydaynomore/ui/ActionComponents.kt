@@ -2,7 +2,6 @@ package com.example.ydaynomore.ui
 
 import android.net.Uri
 import android.util.Log
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,15 +36,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.example.ydaynomore.YNMApplication
 import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.example.ydaynomore.viewmodel.RecycleViewModel
 import kotlin.math.absoluteValue
@@ -65,15 +61,27 @@ fun ActionScreen(
 
     val lastMarked = viewModel.lastMarked.collectAsState()
 
-    val marked = recycleViewModel.allMarked.collectAsState(initial = emptyList())
+    val markedInDataBase = recycleViewModel.allMarked.collectAsState(initial = emptyList())
+    val marked = viewModel.markedImages.collectAsState(initial = emptyList())
 
-    if (marked.value.isNotEmpty()) {
+//    LaunchedEffect(images) {
+//        if (marked.value.size != markedInDataBase.value.size) {
+////            recycleViewModel.removeAll()
+//            marked.value.forEach { target ->
+//                recycleViewModel.mark(target)
+//            }
+//        }
+//    }
 
-        LaunchedEffect(marked) {
-            viewModel.markList(marked.value)
-            Log.v("YDNM", "LAUNCHED EFFECT ${marked.value.size}")
-        }
-    }
+//    if (markedInDataBase.value.isNotEmpty()) {
+//        LaunchedEffect(markedInDataBase) {
+//            if (markedInDataBase.value.size != marked.value.size)
+//            viewModel.restoreMarkList(markedInDataBase.value)
+//            Log.v("YDNM", "LAUNCHED EFFECT ${marked.value.size}")
+//        }
+//    }
+
+
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -119,15 +127,16 @@ fun ActionScreen(
                 onDelButtonClicked = {
                     if (images.value.isNotEmpty()) {
                         // 删除图片
-                        recycleViewModel.mark(images.value[pagerState.currentPage])
+//                        recycleViewModel.mark(images.value[pagerState.currentPage])
                         viewModel.markImage(pagerState.currentPage)
+                        Log.v("YDNM", "MARKED SIZE ${marked.value.size}")
                     }
                 },
                 onRollBackButtonClicked = {
                     val restoreId = viewModel.unMarkLastImage()
-                    if (restoreId != null) {
-                        recycleViewModel.removeId(restoreId)
-                    }
+//                    if (restoreId != null) {
+//                        recycleViewModel.removeId(restoreId)
+//                    }
                 },
                 showRestore = (lastMarked.value != null))
         }

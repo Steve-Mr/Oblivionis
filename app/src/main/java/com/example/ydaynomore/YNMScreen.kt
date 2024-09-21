@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,13 +17,17 @@ import com.example.ydaynomore.ui.ActionScreen
 import com.example.ydaynomore.ui.RecycleScreen
 import com.example.ydaynomore.ui.WelcomeScreen
 import com.example.ydaynomore.ui.rememberCanManageMediaState
+import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 enum class YNMScreen() { Welcome, Action, Recycle }
 
 @Composable
-fun YNMApp(navController: NavHostController = rememberNavController()) {
+fun YNMApp(
+    navController: NavHostController = rememberNavController(),
+    actionViewModel: ActionViewModel = viewModel()
+) {
 
     NavHost(
         navController = navController,
@@ -37,11 +42,15 @@ fun YNMApp(navController: NavHostController = rememberNavController()) {
             } })
         }
         composable (route = YNMScreen.Action.name) {
-            ActionScreen ( onNextButtonClicked = { navController.navigate(YNMScreen.Recycle.name)},
+            ActionScreen (
+                viewModel = actionViewModel,
+                onNextButtonClicked = { navController.navigate(YNMScreen.Recycle.name)},
                 onBackButtonClicked = { /* TODO */ })
         }
         composable (route = YNMScreen.Recycle.name) {
-            RecycleScreen(onBackButtonClicked = {navController.navigateUp()})
+            RecycleScreen(
+                actionViewModel = actionViewModel,
+                onBackButtonClicked = {navController.navigateUp()})
         }
     }
 }
