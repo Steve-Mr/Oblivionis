@@ -74,6 +74,12 @@ class ActionViewModel(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                 ) {
                     loadImages()
+                    viewModelScope.launch {
+                        val databaseMarks = imageRepository.allMarks?.firstOrNull()
+                        if (!databaseMarks.isNullOrEmpty()) {
+                            restoreMarkList(databaseMarks)
+                        }
+                    }
                 }
             }
         }
@@ -222,10 +228,6 @@ class ActionViewModel(
                     cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
                 val displayNameColumn =
                     cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-                val widthColumn =
-                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
-                val heightColumn =
-                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
 
                 Log.i(TAG, "Found ${cursor.count} images")
                 while (cursor.moveToNext()) {
@@ -248,12 +250,10 @@ class ActionViewModel(
             }
         }
 
-        Log.v(TAG, "Found ${images.size} images")
         return images
     }
 
     private suspend fun performDeleteImage(image: MediaStoreImage) {
-        Log.v("YDNM", "PERFORM DELETION")
 
         withContext(Dispatchers.IO) {
             try {
@@ -274,7 +274,6 @@ class ActionViewModel(
         }
     }
     private suspend fun performDeleteImageList(images: List<MediaStoreImage>) {
-        Log.v("YDNM", "PERFORM DELETION")
 
         withContext(Dispatchers.IO) {
             try {
@@ -309,13 +308,6 @@ class ActionViewModel(
 
     init {
         loadImages()
-        viewModelScope.launch {
-            val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            if (!databaseMarks.isNullOrEmpty()) {
-                restoreMarkList(databaseMarks)
-            }
-        }
-        Log.v("YDNM", "VIEWMODEL INIT")
     }
 
     fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
