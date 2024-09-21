@@ -27,11 +27,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ydaynomore.R
 import com.example.ydaynomore.YNMApplication
 import com.example.ydaynomore.data.MediaStoreImage
 import com.example.ydaynomore.viewmodel.ActionViewModel
@@ -88,13 +92,29 @@ fun RecycleScreen(
             )
         },
         floatingActionButton = {
+            val openDialog = remember {
+                mutableStateOf(false)
+            }
+            if (openDialog.value) {
+                Dialog(
+                    onDismissRequest = { openDialog.value = false },
+                    onConfirmation = {
+                        actionViewModel.deleteImages(images.value)
+                        openDialog.value = false },
+                    dialogText = stringResource(id = R.string.deleteAllConfirmation)
+                )
+            }
             FloatingActionButton(onClick = {
-                actionViewModel.deleteImages(images.value)
+                openDialog.value = true
             }) {
                 
             }
         }
     ) { innerPadding ->
+        val openDialog = remember {
+            mutableStateOf(false)
+        }
+
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(2),
             verticalItemSpacing = 4.dp,
@@ -103,9 +123,19 @@ fun RecycleScreen(
                 Log.v("YDNM", "RECYCLE ${images.value.size}")
                 items(images.value.size) { index ->
 
+                    if (openDialog.value) {
+                        Dialog(
+                            onDismissRequest = { openDialog.value = false },
+                            onConfirmation = {
+                                actionViewModel.unMarkImage(images.value[index])
+                                openDialog.value = false },
+                            dialogText = stringResource(id = R.string.restoreConfirmation)
+                        )
+                    }
+
                     MediaPlayer(modifier = Modifier.fillMaxWidth(fraction = 0.5f), uri = images.value[index].contentUri,
                         onClick = {
-                            actionViewModel.unMarkImage(images.value[index])
+                            openDialog.value = true
                         })
                 }
             },

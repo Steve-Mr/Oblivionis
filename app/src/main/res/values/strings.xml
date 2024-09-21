@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">YdayNoMore</string>
+    <string name="deleteAllConfirmation">This action will delete ALL of these media.</string>
+    <string name="restoreConfirmation">This image/video will be restored.</string>
 </resources>
