@@ -1,6 +1,11 @@
 package com.example.ydaynomore.ui
 
+import android.app.Activity
+import android.content.IntentSender
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,20 +36,35 @@ import com.example.ydaynomore.YNMApplication
 import com.example.ydaynomore.data.MediaStoreImage
 import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.example.ydaynomore.viewmodel.RecycleViewModel
+import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecycleScreen(
-    recycleViewModel: RecycleViewModel = viewModel(
-        factory = RecycleViewModel.Factory
-    ),
     actionViewModel: ActionViewModel = viewModel(),
     onBackButtonClicked: () -> Unit) {
 
     val images = actionViewModel.markedImages.collectAsState(initial = emptyList())
 
-    LaunchedEffect(images) {
-        Log.v("YDNM", "RECYCLE EFFECT ${images.value.size}")
+    val intentSender = actionViewModel.pendingDeleteIntentSender.collectAsState(initial = null)
+
+    // 创建删除请求的 launcher
+    val deleteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        Log.v("YDNM", "DELETE LAUNCHER")
+
+        // 处理结果
+        if (result.resultCode == Activity.RESULT_OK) {
+            // 删除成功后的逻辑
+            actionViewModel.deletePendingImage()
+        }
+    }
+
+    LaunchedEffect(intentSender.value) {
+        intentSender.value?.let { intentSender ->
+            deleteLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+        }
     }
 
     Scaffold(
@@ -70,7 +90,6 @@ fun RecycleScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 actionViewModel.deleteImages(images.value)
-                recycleViewModel.removeAll()
             }) {
                 
             }

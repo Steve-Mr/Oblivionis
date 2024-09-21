@@ -14,19 +14,30 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
+import com.example.ydaynomore.YNMApplication
+import com.example.ydaynomore.data.ImageRepository
 import com.example.ydaynomore.data.MediaStoreImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
-class ActionViewModel(application: Application): AndroidViewModel(application) {
+class ActionViewModel(
+    application: Application,
+    private val imageRepository: ImageRepository): AndroidViewModel(application) {
     private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
 
     val markedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
@@ -44,6 +55,10 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
     private var pendingDeleteImage: MediaStoreImage? = null
     private val _permissionNeededForDelete = MutableLiveData<IntentSender?>()
     val permissionNeededForDelete: LiveData<IntentSender?> = _permissionNeededForDelete
+
+    private val _pendingDeleteIntentSender = MutableStateFlow<IntentSender?>(null)
+    val pendingDeleteIntentSender: Flow<IntentSender?> = _pendingDeleteIntentSender
+
 
     /**
      * Performs a one shot load of images from [MediaStore.Images.Media.EXTERNAL_CONTENT_URI] into
@@ -66,9 +81,8 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
 
     fun deleteImages(images: List<MediaStoreImage>) {
         viewModelScope.launch {
-            images.forEach {
-                performDeleteImage(it)
-            }
+            performDeleteImageList(images)
+            clearImages()
         }
     }
 
@@ -94,6 +108,7 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
         // 获取要标记的图片
         val target = unmarkedImageList[index]
         _lastMarked.value = target.copy(isMarked = true)
+        databaseMark(target)
 
         // 复制原始图片列表并找到要标记的图片的索引
         val updatedList = _images.value.toMutableList()
@@ -129,6 +144,7 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
             if (index != -1) {
                 // 更新 isMarked 状态为 false
                 updatedList[index] = img.copy(isMarked = false)
+                databaseUnmark(img)
 
                 // 更新 _images 的值
                 _images.value = updatedList
@@ -146,10 +162,18 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
     fun unMarkImage(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
         updatedList[updatedList.indexOf(target.copy(isMarked = true))] = target.copy(isMarked = false)
+        databaseUnmark(target)
         if (target == _lastMarked.value) {
             _lastMarked.value = null
         }
         _images.value = updatedList
+    }
+
+    fun clearImages() {
+        _images.update { currentList ->
+            currentList.filter { !it.isMarked }
+        }
+        databaseRemoveAll()
     }
 
     fun restoreMarkList(listToMark: List<MediaStoreImage>) {
@@ -157,6 +181,7 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
 
         updatedList.forEach { item ->
             updatedList[updatedList.indexOf(item)] = item.copy(isMarked = item in listToMark)
+            Log.v("YDNM", "ITEM IS ${item in listToMark}")
         }
         _images.value = updatedList
 
@@ -228,11 +253,12 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
     }
 
     private suspend fun performDeleteImage(image: MediaStoreImage) {
+        Log.v("YDNM", "PERFORM DELETION")
+
         withContext(Dispatchers.IO) {
             try {
-
-                MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, arrayListOf(image.contentUri))
-
+                val deleteRequest = MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, arrayListOf(image.contentUri))
+                _pendingDeleteIntentSender.value = deleteRequest.intentSender
             } catch (securityException: SecurityException) {
                 val recoverableSecurityException =
                     securityException as? RecoverableSecurityException
@@ -241,6 +267,29 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
                 // Signal to the Activity that it needs to request permission and
                 // try the delete again if it succeeds.
                 pendingDeleteImage = image
+                _permissionNeededForDelete.postValue(
+                    recoverableSecurityException.userAction.actionIntent.intentSender
+                )
+            }
+        }
+    }
+    private suspend fun performDeleteImageList(images: List<MediaStoreImage>) {
+        Log.v("YDNM", "PERFORM DELETION")
+
+        withContext(Dispatchers.IO) {
+            try {
+                val deleteRequest = MediaStore.createDeleteRequest(
+                    getApplication<Application>().contentResolver,
+                    images.map { it.contentUri })
+                _pendingDeleteIntentSender.value = deleteRequest.intentSender
+            } catch (securityException: SecurityException) {
+                val recoverableSecurityException =
+                    securityException as? RecoverableSecurityException
+                        ?: throw securityException
+
+                // Signal to the Activity that it needs to request permission and
+                // try the delete again if it succeeds.
+                pendingDeleteImage = images.first()
                 _permissionNeededForDelete.postValue(
                     recoverableSecurityException.userAction.actionIntent.intentSender
                 )
@@ -260,7 +309,46 @@ class ActionViewModel(application: Application): AndroidViewModel(application) {
 
     init {
         loadImages()
+        viewModelScope.launch {
+            val databaseMarks = imageRepository.allMarks?.firstOrNull()
+            if (!databaseMarks.isNullOrEmpty()) {
+                restoreMarkList(databaseMarks)
+            }
+        }
         Log.v("YDNM", "VIEWMODEL INIT")
+    }
+
+    fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
+        imageRepository.mark(image.copy(isMarked = false))
+    }
+
+    fun databaseUnmark(image: MediaStoreImage) = viewModelScope.launch {
+        imageRepository.unmark(image.copy(isMarked = false))
+    }
+
+    fun databaseRemoveAll() = viewModelScope.launch {
+        imageRepository.removeAll()
+    }
+
+    fun removeId(id: Long) = viewModelScope.launch {
+        imageRepository.removeId(id)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    companion object {
+        val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>,
+                extras: CreationExtras
+            ): T {
+                val application = checkNotNull(extras[APPLICATION_KEY])
+
+                return ActionViewModel(
+                    application = application,
+                    imageRepository = (application as YNMApplication).repository
+                ) as T
+            }
+        }
     }
 }
 

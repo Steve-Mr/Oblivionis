@@ -26,7 +26,9 @@ enum class YNMScreen() { Welcome, Action, Recycle }
 @Composable
 fun YNMApp(
     navController: NavHostController = rememberNavController(),
-    actionViewModel: ActionViewModel = viewModel()
+    actionViewModel: ActionViewModel = viewModel(
+        factory = ActionViewModel.Factory
+    )
 ) {
 
     NavHost(

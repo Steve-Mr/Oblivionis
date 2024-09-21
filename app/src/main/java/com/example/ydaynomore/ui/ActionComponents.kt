@@ -50,9 +50,6 @@ import kotlin.math.absoluteValue
 @Composable
 fun ActionScreen(
     viewModel: ActionViewModel = viewModel(),
-    recycleViewModel: RecycleViewModel = viewModel(
-        factory = RecycleViewModel.Factory
-    ),
     onNextButtonClicked: () -> Unit,
     onBackButtonClicked: () -> Unit,
 ) {
@@ -61,26 +58,7 @@ fun ActionScreen(
 
     val lastMarked = viewModel.lastMarked.collectAsState()
 
-    val markedInDataBase = recycleViewModel.allMarked.collectAsState(initial = emptyList())
     val marked = viewModel.markedImages.collectAsState(initial = emptyList())
-
-//    LaunchedEffect(images) {
-//        if (marked.value.size != markedInDataBase.value.size) {
-////            recycleViewModel.removeAll()
-//            marked.value.forEach { target ->
-//                recycleViewModel.mark(target)
-//            }
-//        }
-//    }
-
-//    if (markedInDataBase.value.isNotEmpty()) {
-//        LaunchedEffect(markedInDataBase) {
-//            if (markedInDataBase.value.size != marked.value.size)
-//            viewModel.restoreMarkList(markedInDataBase.value)
-//            Log.v("YDNM", "LAUNCHED EFFECT ${marked.value.size}")
-//        }
-//    }
-
 
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
@@ -126,17 +104,11 @@ fun ActionScreen(
                 modifier = Modifier.navigationBarsPadding(),
                 onDelButtonClicked = {
                     if (images.value.isNotEmpty()) {
-                        // 删除图片
-//                        recycleViewModel.mark(images.value[pagerState.currentPage])
                         viewModel.markImage(pagerState.currentPage)
-                        Log.v("YDNM", "MARKED SIZE ${marked.value.size}")
                     }
                 },
                 onRollBackButtonClicked = {
-                    val restoreId = viewModel.unMarkLastImage()
-//                    if (restoreId != null) {
-//                        recycleViewModel.removeId(restoreId)
-//                    }
+                    viewModel.unMarkLastImage()
                 },
                 showRestore = (lastMarked.value != null))
         }

@@ -20,7 +20,7 @@ interface ImageDao {
     suspend fun removeAll()
 
     @Query("SELECT * FROM images")
-    fun getAllMarks(): Flow<List<MediaStoreImage>>
+    fun getAllMarks(): Flow<List<MediaStoreImage>>?
 
     @Query("SELECT * FROM images ORDER BY date_added DESC LIMIT 1")
     suspend fun getLastMarked(): MediaStoreImage

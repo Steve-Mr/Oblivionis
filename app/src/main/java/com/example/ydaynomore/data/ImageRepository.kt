@@ -5,7 +5,11 @@ import kotlinx.coroutines.flow.Flow
 
 
 class ImageRepository(private val imageDao: ImageDao) {
-    val allMarks: Flow<List<MediaStoreImage>> = imageDao.getAllMarks()
+    val allMarks: Flow<List<MediaStoreImage>>? = imageDao.getAllMarks()
+
+//    suspend fun getAllMarks(): List<MediaStoreImage>? {
+//        return imageDao.getAllMarks()
+//    }
 
     @WorkerThread
     suspend fun mark(image: MediaStoreImage) {

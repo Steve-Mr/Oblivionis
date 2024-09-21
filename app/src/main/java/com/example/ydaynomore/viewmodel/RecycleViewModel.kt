@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 /* TODO: database only use for persistence not compose */
 class RecycleViewModel(private val imageRepository: ImageRepository): ViewModel() {
-    val allMarked: Flow<List<MediaStoreImage>> = imageRepository.allMarks
+//    val allMarked: List<MediaStoreImage> = imageRepository.allMarks
 
     fun mark(image: MediaStoreImage) = viewModelScope.launch {
         imageRepository.mark(image)
