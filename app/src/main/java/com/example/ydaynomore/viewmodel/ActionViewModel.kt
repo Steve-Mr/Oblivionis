@@ -6,6 +6,7 @@ import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.IntentSender
 import android.database.ContentObserver
+import android.database.Cursor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -20,18 +21,20 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.ydaynomore.YNMApplication
+import com.example.ydaynomore.data.Album
 import com.example.ydaynomore.data.ImageRepository
 import com.example.ydaynomore.data.MediaStoreImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -47,10 +50,14 @@ class ActionViewModel(
         images.filter { !it.isMarked }
     }
 
+    var albumPath: String? = null
+
     private val _lastMarked = MutableStateFlow<MediaStoreImage?>(null)
     val lastMarked = _lastMarked.asStateFlow()
 
     private var contentObserver: ContentObserver? = null
+    private var videoContentObserver: ContentObserver? = null
+
 
     private var pendingDeleteImage: MediaStoreImage? = null
     private val _permissionNeededForDelete = MutableLiveData<IntentSender?>()
@@ -69,13 +76,31 @@ class ActionViewModel(
             val imageList = queryImages()
             _images.value = imageList
 
+            val databaseMarks = imageRepository.allMarks?.firstOrNull()
+            if (!databaseMarks.isNullOrEmpty()) {
+                restoreMarkList(databaseMarks)
+            }
+
             if (contentObserver == null) {
                 contentObserver = getApplication<Application>().contentResolver.registerObserver(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                 ) {
                     loadImages()
                     viewModelScope.launch {
-                        val databaseMarks = imageRepository.allMarks?.firstOrNull()
+                        if (!databaseMarks.isNullOrEmpty()) {
+                            restoreMarkList(databaseMarks)
+                        }
+                    }
+                }
+            }
+
+            if (videoContentObserver == null) {
+
+                videoContentObserver = getApplication<Application>().contentResolver.registerObserver(
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                ) {
+                    loadImages()
+                    viewModelScope.launch {
                         if (!databaseMarks.isNullOrEmpty()) {
                             restoreMarkList(databaseMarks)
                         }
@@ -83,6 +108,74 @@ class ActionViewModel(
                 }
             }
         }
+    }
+
+    private val _albums = MutableStateFlow<List<Album>>(emptyList())
+    val albums: StateFlow<List<Album>> get() = _albums
+
+    private fun loadAlbums() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val albumList = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
+            _albums.value = albumList
+        }
+        Log.v("YDNM", "LOAD ALBUMS")
+
+    }
+
+    // Function to fetch album names and paths from MediaStore for both images and videos
+    private fun getAlbumsFromMediaStore(contentResolver: ContentResolver): List<Album> {
+//        val albums = mutableListOf<Album>()
+        val albumMap = mutableMapOf<String, Album>()
+        Log.v("YDNM", "ALBUMS FUNCTION")
+
+        // Query both Images and Videos
+        val uriList = listOf(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // Images URI
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI   // Videos URI
+        )
+
+        val projection = arrayOf(
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
+            MediaStore.Images.Media.DATA,
+        )
+
+        val selection = "(${MediaStore.Images.Media.MIME_TYPE} = ? OR ${MediaStore.Images.Media.MIME_TYPE} = ?)"
+        val selectionArgs = arrayOf("image/*", "video/*")  // Filter only JPEG images and MP4 videos
+        val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC"
+
+        for (uri in uriList) {
+            val cursor: Cursor? = contentResolver.query(
+                uri,
+                projection,
+                null,
+                null,
+                sortOrder
+            )
+
+            cursor?.use {
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(nameColumn)
+                    val path = File(cursor.getString(pathColumn)).parent!!.replace("/storage/emulated/0/", "")
+                    // Check if this album (BUCKET_ID) is already in the map
+                    val album = albumMap[path]
+                    if (album == null) {
+                        // Add a new album with an initial count of 1
+                        albumMap[path] = Album(name, path, 1)
+                    } else {
+                        // Increment the media count for this album
+                        albumMap[path] = album.copy(mediaCount = album.mediaCount + 1)
+                    }
+//                    albums.add(Album(name, path))
+                    Log.v("YDNM", "CURSOR $name")
+                }
+            }
+        }
+
+//        return albums.distinctBy { it.path } // Ensure no duplicates
+        return albumMap.values.toList()
     }
 
     fun deleteImages(images: List<MediaStoreImage>) {
@@ -199,53 +292,60 @@ class ActionViewModel(
 
         withContext(Dispatchers.IO) {
 
+            val uriList = listOf(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // Images URI
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI   // Videos URI
+            )
+
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME,
-                MediaStore.Images.Media.DATE_ADDED,
-                MediaStore.Images.Media.WIDTH,
-                MediaStore.Images.Media.HEIGHT
+                MediaStore.Images.Media.DATE_ADDED
             )
 
             val selection = "${MediaStore.Images.ImageColumns.RELATIVE_PATH} like ?"
 
             val selectionArgs = arrayOf(
-                "Pictures/Screenshots/%"
+                "${albumPath}/%"
             )
+
+            Log.v("YDNM", "ARGS $selectionArgs")
 
             val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
-            getApplication<Application>().contentResolver.query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                sortOrder
-            )?.use { cursor ->
+            for (uri in uriList) {
+                getApplication<Application>().contentResolver.query(
+                    uri,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder
+                )?.use { cursor ->
 
-                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                val dateModifiedColumn =
-                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-                val displayNameColumn =
-                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val dateModifiedColumn =
+                        cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                    val displayNameColumn =
+                        cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
 
-                Log.i(TAG, "Found ${cursor.count} images")
-                while (cursor.moveToNext()) {
+                    Log.i(TAG, "Found ${cursor.count} images")
+                    while (cursor.moveToNext()) {
 
-                    // Here we'll use the column index that we found above.
-                    val id = cursor.getLong(idColumn)
-                    val dateModified =
-                        Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateModifiedColumn)))
-                    val displayName = cursor.getString(displayNameColumn)
+                        // Here we'll use the column index that we found above.
+                        val id = cursor.getLong(idColumn)
+                        val dateModified =
+                            Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateModifiedColumn)))
+                        val displayName = cursor.getString(displayNameColumn)
 
-                    val contentUri = ContentUris.withAppendedId(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        id
-                    )
+                        val contentUri = ContentUris.withAppendedId(
+                            uri,
+                            id
+                        )
 
-                    val image = MediaStoreImage(id, displayName, dateModified, contentUri)
+                        val image = MediaStoreImage(id, displayName, dateModified, contentUri)
 
-                    images += image
+                        images += image
+                    }
                 }
             }
         }
@@ -304,10 +404,14 @@ class ActionViewModel(
         contentObserver?.let {
             getApplication<Application>().contentResolver.unregisterContentObserver(it)
         }
+        videoContentObserver?.let {
+            getApplication<Application>().contentResolver.unregisterContentObserver(it)
+        }
     }
 
     init {
-        loadImages()
+//        loadImages()
+        loadAlbums()
     }
 
     fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {

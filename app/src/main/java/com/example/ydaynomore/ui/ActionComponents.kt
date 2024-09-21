@@ -1,6 +1,7 @@
 package com.example.ydaynomore.ui
 
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,19 +29,28 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SimpleExoPlayer
+import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.example.ydaynomore.viewmodel.RecycleViewModel
@@ -63,6 +73,14 @@ fun ActionScreen(
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
+
+    val albums = viewModel.albums.collectAsState()
+
+    LaunchedEffect(albums) {
+        albums.value.forEach { album ->
+            Log.v("YDNM", "ALBUM ${album.name}, ${album.path}")
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -147,13 +165,13 @@ fun ActionScreen(
                 if (page == pagerState.currentPage) {
                     elevation = 20.dp
                 }
+                val uri = images.value[page].contentUri
 
-                    AsyncImage(
-                        model = images.value[page].contentUri, contentDescription = "",
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .shadow(elevation = elevation)
-                    )
+                MediaPlayer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(elevation = elevation), uri = uri)
+
                     // TODO: placeholder for empty folder
 
             }
@@ -163,24 +181,23 @@ fun ActionScreen(
 }
 
 @Composable
-fun ActionImage(
-    modifier: Modifier,
-    uri: Uri,
-    onClick: () -> Unit = {}) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        AsyncImage(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .clickable {
-                    onClick()
-                },
-            alignment = Alignment.Center,
-            model = uri,
-            contentDescription = ""
-        )
+fun MediaPlayer(modifier: Modifier, uri: Uri,
+                onClick: () -> Unit = {}) {
+    when {
+        uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+            // 处理图片变化
+            AsyncImage(
+                model = uri,
+                contentDescription = "",
+                modifier = modifier
+                    .clickable { onClick() }
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
+        uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+            // 处理视频变化
+            ExoPlayerView(modifier, uri, onClick)
+        }
     }
 }
 
@@ -214,6 +231,46 @@ fun ActionRow(
             }
         }
     }
+}
+
+@Composable
+fun ExoPlayerView(
+    modifier: Modifier = Modifier,
+    uri: Uri, onClick: () -> Unit) {
+    // Get the current context
+    val context = LocalContext.current
+
+    // Initialize ExoPlayer
+    val exoPlayer = ExoPlayer.Builder(context).build()
+
+    // Create a MediaSource
+    val mediaSource = remember(uri) {
+        MediaItem.fromUri(uri)
+    }
+
+    // Set MediaSource to ExoPlayer
+    LaunchedEffect(mediaSource) {
+        exoPlayer.setMediaItem(mediaSource)
+        exoPlayer.prepare()
+    }
+
+    // Manage lifecycle events
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    // Use AndroidView to embed an Android View (PlayerView) into Compose
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                player = exoPlayer
+            }
+        },
+        modifier = modifier
+            .clickable { onClick() }
+    )
 }
 
 @Preview(

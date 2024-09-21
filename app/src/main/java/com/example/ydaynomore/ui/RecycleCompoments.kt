@@ -102,9 +102,8 @@ fun RecycleScreen(
             content = {
                 Log.v("YDNM", "RECYCLE ${images.value.size}")
                 items(images.value.size) { index ->
-                    ActionImage(modifier = Modifier
-                        .fillMaxWidth(fraction = 0.5f),
-                        uri = images.value[index].contentUri,
+
+                    MediaPlayer(modifier = Modifier.fillMaxWidth(fraction = 0.5f), uri = images.value[index].contentUri,
                         onClick = {
                             actionViewModel.unMarkImage(images.value[index])
                         })
