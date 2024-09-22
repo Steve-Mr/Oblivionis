@@ -78,17 +78,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.coil)
     implementation(libs.coil.compose)
-
-//    implementation(libs.glide)
-//    implementation(libs.compose)
+    implementation(libs.coil3.coil.video)
 
     implementation(libs.accompanist.permissions)
 
     implementation(libs.androidx.room.runtime)
     annotationProcessor(libs.androidx.room.compiler)
 
-    // To use Kotlin annotation processing tool (kapt)
-//    kapt("androidx.room:room-compiler:$room_version")
     // To use Kotlin Symbol Processing (KSP)
     ksp(libs.androidx.room.compiler)
 
@@ -98,5 +94,9 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
+
+    implementation(libs.compose.video)
+    implementation(libs.androidx.media3.session)
+
 
 }

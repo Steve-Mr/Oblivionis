@@ -47,6 +47,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.ImageLoader
+import coil3.video.VideoFrameDecoder
 import com.example.ydaynomore.R
 import com.example.ydaynomore.YNMApplication
 import com.example.ydaynomore.data.MediaStoreImage
@@ -63,6 +65,12 @@ fun RecycleScreen(
     val images = actionViewModel.markedImages.collectAsState(initial = emptyList())
 
     val intentSender = actionViewModel.pendingDeleteIntentSender.collectAsState(initial = null)
+
+    val imageLoader = ImageLoader.Builder(LocalContext.current)
+        .components {
+            add(VideoFrameDecoder.Factory())
+        }
+        .build()
 
     // 创建删除请求的 launcher
     val deleteLauncher = rememberLauncherForActivityResult(
@@ -161,9 +169,10 @@ fun RecycleScreen(
 
                         MediaPlayer(
                             modifier = Modifier
-                                .fillMaxWidth(fraction = 0.33f)
+//                                .fillMaxWidth(fraction = 0.33f)
                                 .padding(2.dp),
                             uri = images.value[index].contentUri,
+                            imageLoader = imageLoader,
                             onClick = {
                                 clickedIndex.intValue = index
                                 openDialog.value = true

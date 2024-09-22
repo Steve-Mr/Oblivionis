@@ -1,5 +1,6 @@
 package com.example.ydaynomore.ui
 
+import android.content.Intent
 import android.content.res.Resources
 import android.net.Uri
 import android.provider.MediaStore
@@ -32,6 +33,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,8 +48,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -61,9 +65,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.video.VideoFrameDecoder
 import com.example.ydaynomore.R
 import com.example.ydaynomore.viewmodel.ActionViewModel
+import io.sanghun.compose.video.RepeatMode
+import io.sanghun.compose.video.VideoPlayer
+import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
+import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,11 +95,18 @@ fun ActionScreen(
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
+    val imageLoader = ImageLoader.Builder(LocalContext.current)
+        .components {
+            add(VideoFrameDecoder.Factory())
+        }
+        .build()
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
 
         topBar = {
             CenterAlignedTopAppBar(
+                modifier = Modifier.shadow(10.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
@@ -168,6 +186,11 @@ fun ActionScreen(
 
                     val uri = images.value[page].contentUri
 
+                    val context = LocalContext.current
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = uri
+                    }
+
                     MediaPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -182,25 +205,24 @@ fun ActionScreen(
 
                                 // We animate the alpha, between 50% and 100%
                                 alpha = lerp(
-                                    start = 0.5f,
+                                    start = 0.3f,
                                     stop = 1f,
                                     fraction = 1f - pageOffset.coerceIn(0f, 1f)
                                 )
 
-                                shadowElevation = lerp(
-                                    start = 0f,
-                                    stop = 10f,
-                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
-                                )
-
-                                // 设置圆角效果 (应用于阴影的边缘)
-                                shape = RoundedCornerShape(8.dp)  // 圆角半径
-                                clip = true  // 确保视图被剪切到圆角形状
-                            }, uri = uri
+//                                shadowElevation = lerp(
+//                                    start = 0f,
+//                                    stop = 10f,
+//                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+//                                )
+//
+//                                // 设置圆角效果 (应用于阴影的边缘)
+//                                shape = RoundedCornerShape(8.dp)  // 圆角半径
+//                                clip = true  // 确保视图被剪切到圆角形状
+                            }, uri = uri, imageLoader = imageLoader, onClick = {
+                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
+                            }
                     )
-
-                    // TODO: placeholder for empty folder
-
                 }
 
             }
@@ -208,7 +230,7 @@ fun ActionScreen(
 }
 
 @Composable
-fun MediaPlayer(modifier: Modifier, uri: Uri,
+fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
                 onClick: () -> Unit = {}) {
     when {
         uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
@@ -223,7 +245,11 @@ fun MediaPlayer(modifier: Modifier, uri: Uri,
         }
         uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
             // 处理视频变化
-            ExoPlayerView(modifier, uri, onClick)
+//            ExoPlayerView(modifier, uri, onClick)
+//            VideoView(modifier = modifier, uri = uri)
+            VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader,onClick = {
+                onClick()
+            })
         }
     }
 }
@@ -318,6 +344,76 @@ fun ExoPlayerView(
         modifier = modifier
             .clickable { onClick() }
     )
+}
+
+@Composable
+fun VideoView(
+    modifier: Modifier,
+    uri: Uri) {
+    VideoPlayer(
+        mediaItems = listOf(
+            VideoPlayerMediaItem.StorageMediaItem(
+                storageUri = uri
+            )
+        ),
+        handleLifecycle = true,
+        autoPlay = false,
+        usePlayerController = true,
+        enablePip = false,
+        handleAudioFocus = true,
+        controllerConfig = VideoPlayerControllerConfig(
+            showSpeedAndPitchOverlay = false,
+            showSubtitleButton = false,
+            showCurrentTimeAndTotalTime = false,
+            showBufferingProgress = false,
+            showForwardIncrementButton = false,
+            showBackwardIncrementButton = false,
+            showBackTrackButton = false,
+            showNextTrackButton = false,
+            showRepeatModeButton = false,
+            controllerShowTimeMilliSeconds = 5_000,
+            controllerAutoShow = false,
+            showFullScreenButton = false
+        ),
+        volume = 0.5f,  // volume 0.0f to 1.0f
+        repeatMode = RepeatMode.NONE,       // or RepeatMode.ALL, RepeatMode.ONE
+        modifier = modifier.fillMaxSize(),
+    )
+}
+
+@Composable
+fun VideoViewAlt(
+    modifier: Modifier,
+    uri: Uri,
+    imageLoader: ImageLoader,
+    onClick: () -> Unit = {}
+){
+    Box(modifier = modifier
+        .clickable { onClick() }, contentAlignment = Alignment.BottomEnd) {
+        AsyncImage(
+            model = uri,
+            contentDescription = "",
+            imageLoader = imageLoader,
+            modifier = modifier
+                .clickable { onClick() }
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+        )
+        IconButton(onClick = { /*TODO*/ },
+            colors = IconButtonColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.padding(8.dp)) {
+            Icon(painter = painterResource(id = R.drawable.ic_play), contentDescription = stringResource(
+                id = R.string.choose_app
+            ))
+
+        }
+    }
+
+
 }
 
 @Composable
