@@ -7,14 +7,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,10 +37,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -56,7 +68,6 @@ fun RecycleScreen(
     val deleteLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        Log.v("YDNM", "DELETE LAUNCHER")
 
         // 处理结果
         if (result.resultCode == Activity.RESULT_OK) {
@@ -75,74 +86,96 @@ fun RecycleScreen(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    scrolledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { onBackButtonClicked() }) {
+                    FilledTonalButton(onClick = { onBackButtonClicked() },
+                        modifier = Modifier.padding(start = 16.dp)) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Localized description"
+                            painter = painterResource(
+                                id = R.drawable.ic_close),
+                            contentDescription = stringResource(
+                                id = R.string.close)
                         )
+                        Text(stringResource(id = R.string.close))
                     }
                 },
-                title = {
-                    Text("Recycle")
-                }
+                actions = {
+                    val openDialog = remember {
+                        mutableStateOf(false)
+                    }
+                    if (openDialog.value) {
+                        Dialog(
+                            onDismissRequest = { openDialog.value = false },
+                            onConfirmation = {
+                                actionViewModel.deleteImages(images.value)
+                                openDialog.value = false },
+                            dialogText = stringResource(id = R.string.deleteAllConfirmation)
+                        )
+                    }
+                    FilledTonalButton(onClick = { openDialog.value = true },
+                        modifier = Modifier.padding(end = 16.dp)) {
+                        Text(stringResource(id = R.string.deleteAll))
+                    }
+                },
+                title = {}
             )
-        },
-        floatingActionButton = {
-            val openDialog = remember {
-                mutableStateOf(false)
-            }
-            if (openDialog.value) {
-                Dialog(
-                    onDismissRequest = { openDialog.value = false },
-                    onConfirmation = {
-                        actionViewModel.deleteImages(images.value)
-                        openDialog.value = false },
-                    dialogText = stringResource(id = R.string.deleteAllConfirmation)
-                )
-            }
-            FloatingActionButton(onClick = {
-                openDialog.value = true
-            }) {
-                
-            }
         }
     ) { innerPadding ->
         val openDialog = remember {
             mutableStateOf(false)
         }
 
-        LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Fixed(2),
-            verticalItemSpacing = 4.dp,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            content = {
-                Log.v("YDNM", "RECYCLE ${images.value.size}")
-                items(images.value.size) { index ->
+        val clickedIndex = remember { mutableIntStateOf(-1) }
 
-                    if (openDialog.value) {
-                        Dialog(
-                            onDismissRequest = { openDialog.value = false },
-                            onConfirmation = {
-                                actionViewModel.unMarkImage(images.value[index])
-                                openDialog.value = false },
-                            dialogText = stringResource(id = R.string.restoreConfirmation)
+        LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(3),
+                content = {
+                    item(span = StaggeredGridItemSpan.FullLine ) {
+                        Spacer(
+                            Modifier.height(innerPadding.calculateTopPadding())
                         )
                     }
+                    items(images.value.size) { index ->
 
-                    MediaPlayer(modifier = Modifier.fillMaxWidth(fraction = 0.5f), uri = images.value[index].contentUri,
-                        onClick = {
-                            openDialog.value = true
-                        })
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        )
+                        if (openDialog.value) {
+                            Dialog(
+                                onDismissRequest = { openDialog.value = false },
+                                onConfirmation = {
+                                    actionViewModel.unMarkImage(images.value[clickedIndex.intValue])
+                                    clickedIndex.intValue = -1
+                                    openDialog.value = false
+                                },
+                                dialogText = stringResource(id = R.string.restoreConfirmation)
+                            )
+                        }
+
+                        /* TODO: 顺序存在问题 */
+
+                        MediaPlayer(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction = 0.33f)
+                                .padding(2.dp),
+                            uri = images.value[index].contentUri,
+                            onClick = {
+                                clickedIndex.intValue = index
+                                openDialog.value = true
+                            })
+
+                    }
+                    item(span = StaggeredGridItemSpan.FullLine ) {
+                        Spacer(
+                            Modifier.windowInsetsBottomHeight(
+                                WindowInsets.systemBars
+                            )
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+            )
     }
 }
 

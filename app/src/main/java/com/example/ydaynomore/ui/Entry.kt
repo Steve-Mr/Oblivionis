@@ -4,10 +4,15 @@ import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Badge
@@ -25,9 +30,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ydaynomore.R
 import com.example.ydaynomore.viewmodel.ActionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,7 +61,7 @@ fun EntryScreen(
                     Box (modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.BottomStart){
                         Text(
-                            "Large Top App Bar",
+                            stringResource(id = R.string.happy_deleting),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -67,16 +74,21 @@ fun EntryScreen(
     ) { innerPadding ->
         LazyColumn(modifier = Modifier
             .fillMaxSize()
-            .padding(innerPadding)) {
-            item {
-                Box(modifier = Modifier.fillMaxHeight(0.5f)) // Adjust the proportion as needed
-            }
+            .padding(top = innerPadding.calculateTopPadding())) {
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
             items(albums.value) { album ->
                 EntryItem(name = album.name, num = album.mediaCount, onClick = {
                     viewModel.albumPath = album.path
                     onClick()
                 })
-                Log.v("YDNM", "ALBUM ${album.name} ${album.path}")
+            }
+            item {
+                Spacer(
+                    Modifier.windowInsetsBottomHeight(
+                        WindowInsets.systemBars
+                    )
+                )
             }
         }
     }
@@ -93,7 +105,9 @@ fun EntryItem(
 ) {
 
     Card(
-        modifier = Modifier.clickable { onClick() }.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         )
@@ -116,10 +130,3 @@ fun EntryItem(
     }
 
 }
-//
-//@Composable
-//@Preview(showBackground = true, showSystemUi = true)
-//fun EntryItemPreview() {
-////    EntryItem(name = "Screenshots", num = 15)
-//    EntryScreen()
-//}

@@ -2,4 +2,13 @@
     <string name="app_name">YdayNoMore</string>
     <string name="deleteAllConfirmation">This action will delete ALL of these media.</string>
     <string name="restoreConfirmation">This image/video will be restored.</string>
+    <string name="close">Close</string>
+    <string name="deleteAll">Delete All</string>
+    <string name="go_to_recycle_screen">To recycle screen.</string>
+    <string name="back">Back to last page.</string>
+    <string name="restore_last_deleted">Restore last deleted media.</string>
+    <string name="mark_this_to_delete">Mark this media to delete.</string>
+    <string name="confirm">Confirm</string>
+    <string name="cancel">Cancel</string>
+    <string name="happy_deleting">Happy Deleting</string>
 </resources>

@@ -3,26 +3,40 @@ package com.example.ydaynomore.ui
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeGesturesPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsEndWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,9 +55,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -56,6 +74,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SimpleExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
+import com.example.ydaynomore.R
 import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.example.ydaynomore.viewmodel.RecycleViewModel
 import kotlin.math.absoluteValue
@@ -80,12 +99,6 @@ fun ActionScreen(
 
     val albums = viewModel.albums.collectAsState()
 
-    LaunchedEffect(albums) {
-        albums.value.forEach { album ->
-            Log.v("YDNM", "ALBUM ${album.name}, ${album.path}")
-        }
-    }
-
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
 
@@ -97,8 +110,8 @@ fun ActionScreen(
                 ),
                 title = {
                     Text(
-                        "Centered Top App Bar",
-                        maxLines = 1,
+                        viewModel.albumPath.toString().substringAfterLast("/"),
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 },
@@ -106,19 +119,26 @@ fun ActionScreen(
                     IconButton(onClick = { onBackButtonClicked() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Localized description"
+                            contentDescription = stringResource(id = R.string.back)
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onNextButtonClicked() }) {
-                        BadgedBox(badge = { Badge { Text(text = marked.value.size.toString())}}) {
-                            Icon(
-                                imageVector = Icons.Filled.Menu,
-                                contentDescription = "Localized description"
-                            )
+                        val badgeColor = if (marked.value.isEmpty()) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            BadgeDefaults.containerColor
                         }
-                    }
+                        BadgedBox(
+                            modifier = Modifier.padding(end = 8.dp),
+                            badge = { Badge (containerColor = badgeColor) { Text(text = marked.value.size.toString())}}) {
+                            IconButton(onClick = { onNextButtonClicked() }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_recycle),
+                                    contentDescription = stringResource(id = R.string.go_to_recycle_screen)
+                                )
+                            }
+                        }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -126,6 +146,7 @@ fun ActionScreen(
         bottomBar = {
             ActionRow(
                 modifier = Modifier.navigationBarsPadding(),
+                delButtonClickable = images.value.isNotEmpty(),
                 onDelButtonClicked = {
                     if (images.value.isNotEmpty()) {
                         viewModel.markImage(pagerState.currentPage)
@@ -149,34 +170,39 @@ fun ActionScreen(
 
             Box(modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    // Calculate the absolute offset for the current page from the
-                    // scroll position. We use the absolute value which allows us to mirror
-                    // any effects for both directions
-                    val pageOffset = (
-                            (pagerState.currentPage - page)
-                                    + pagerState.currentPageOffsetFraction
-                            ).absoluteValue
-
-                    // We animate the alpha, between 50% and 100%
-                    alpha = lerp(
-                        start = 0.5f,
-                        stop = 1f,
-                        fraction = 1f - pageOffset.coerceIn(0f, 1f)
-                    )
-                }
                 .padding(top = 16.dp),
                 contentAlignment = Alignment.Center) {
-                var elevation = 0.dp
-                if (page == pagerState.currentPage) {
-                    elevation = 20.dp
-                }
                 val uri = images.value[page].contentUri
 
                 MediaPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(elevation = elevation), uri = uri)
+                        .graphicsLayer {
+                            // Calculate the absolute offset for the current page from the
+                            // scroll position. We use the absolute value which allows us to mirror
+                            // any effects for both directions
+                            val pageOffset = (
+                                    (pagerState.currentPage - page)
+                                            + pagerState.currentPageOffsetFraction
+                                    ).absoluteValue
+
+                            // We animate the alpha, between 50% and 100%
+                            alpha = lerp(
+                                start = 0.5f,
+                                stop = 1f,
+                                fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                            )
+
+                            shadowElevation = lerp(
+                                start = 0f,
+                                stop = 10f,
+                                fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                            )
+
+                            // 设置圆角效果 (应用于阴影的边缘)
+                            shape = RoundedCornerShape(8.dp)  // 圆角半径
+                            clip = true  // 确保视图被剪切到圆角形状
+                        }, uri = uri)
 
                     // TODO: placeholder for empty folder
 
@@ -210,6 +236,7 @@ fun MediaPlayer(modifier: Modifier, uri: Uri,
 @Composable
 fun ActionRow(
     modifier: Modifier,
+    delButtonClickable: Boolean = true,
     onDelButtonClicked: () -> Unit,
     onRollBackButtonClicked: () -> Unit,
     showRestore: Boolean
@@ -225,15 +252,37 @@ fun ActionRow(
             contentAlignment = Alignment.CenterStart
         ) {
             if (showRestore) {
-            Button(onClick = { onRollBackButtonClicked() }) {
-                Text("RB")
-            }
+                Button(
+                    onClick = onRollBackButtonClicked,
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(48.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(),
+                    elevation = ButtonDefaults.buttonElevation(10.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_restore),
+                        contentDescription = stringResource(
+                            id = R.string.restore_last_deleted
+                        ))
+                }
             }
         }
 
         Box(modifier = Modifier.weight(3f)) {
-            Button(onClick = { onDelButtonClicked() }) {
-                Text("DEL")
+            Button(
+                onClick = onDelButtonClicked,
+                enabled = delButtonClickable,
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.size(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BadgeDefaults.containerColor),
+                elevation = ButtonDefaults.buttonElevation(10.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_close),
+                    contentDescription = stringResource(id = R.string.mark_this_to_delete),
+                    )
             }
         }
     }
@@ -298,7 +347,7 @@ fun Dialog(
                     onConfirmation()
                 }
             ) {
-                Text("Confirm")
+                Text(stringResource(id = R.string.confirm))
             }
         },
         dismissButton = {
@@ -307,7 +356,7 @@ fun Dialog(
                     onDismissRequest()
                 }
             ) {
-                Text("Dismiss")
+                Text(stringResource(id = R.string.cancel))
             }
         }
     )

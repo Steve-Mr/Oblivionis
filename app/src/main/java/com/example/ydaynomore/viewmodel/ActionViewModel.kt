@@ -139,8 +139,6 @@ class ActionViewModel(
             MediaStore.Images.Media.DATA,
         )
 
-        val selection = "(${MediaStore.Images.Media.MIME_TYPE} = ? OR ${MediaStore.Images.Media.MIME_TYPE} = ?)"
-        val selectionArgs = arrayOf("image/*", "video/*")  // Filter only JPEG images and MP4 videos
         val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC"
 
         for (uri in uriList) {
@@ -306,7 +304,7 @@ class ActionViewModel(
             val selection = "${MediaStore.Images.ImageColumns.RELATIVE_PATH} like ?"
 
             val selectionArgs = arrayOf(
-                "${albumPath}/%"
+                "${albumPath}/"
             )
 
             Log.v("YDNM", "ARGS $selectionArgs")
