@@ -1,14 +1,11 @@
 package com.example.ydaynomore.ui
 
 import android.content.Intent
-import android.content.res.Resources
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -67,7 +63,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
 import coil3.video.VideoFrameDecoder
 import com.example.ydaynomore.R
 import com.example.ydaynomore.viewmodel.ActionViewModel
@@ -205,21 +200,17 @@ fun ActionScreen(
 
                                 // We animate the alpha, between 50% and 100%
                                 alpha = lerp(
-                                    start = 0.3f,
+                                    start = 0.4f,
                                     stop = 1f,
                                     fraction = 1f - pageOffset.coerceIn(0f, 1f)
                                 )
 
-//                                shadowElevation = lerp(
-//                                    start = 0f,
-//                                    stop = 10f,
-//                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
-//                                )
-//
-//                                // 设置圆角效果 (应用于阴影的边缘)
-//                                shape = RoundedCornerShape(8.dp)  // 圆角半径
-//                                clip = true  // 确保视图被剪切到圆角形状
-                            }, uri = uri, imageLoader = imageLoader, onClick = {
+                                val scale = 1f - (pageOffset * .1f)
+                                scaleX = scale
+                                scaleY = scale
+
+                            }
+                            , uri = uri, imageLoader = imageLoader, onVideoClick = {
                         context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
                             }
                     )
@@ -231,7 +222,7 @@ fun ActionScreen(
 
 @Composable
 fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
-                onClick: () -> Unit = {}) {
+                onImageClick: () -> Unit = {}, onVideoClick: () -> Unit) {
     when {
         uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
             // 处理图片变化
@@ -239,16 +230,15 @@ fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
                 model = uri,
                 contentDescription = "",
                 modifier = modifier
-                    .clickable { onClick() }
+                    .clickable { onImageClick() }
                     .clip(RoundedCornerShape(8.dp))
             )
         }
         uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
             // 处理视频变化
-//            ExoPlayerView(modifier, uri, onClick)
 //            VideoView(modifier = modifier, uri = uri)
             VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader,onClick = {
-                onClick()
+                onVideoClick()
             })
         }
     }

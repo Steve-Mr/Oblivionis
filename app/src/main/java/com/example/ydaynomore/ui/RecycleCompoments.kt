@@ -169,11 +169,14 @@ fun RecycleScreen(
 
                         MediaPlayer(
                             modifier = Modifier
-//                                .fillMaxWidth(fraction = 0.33f)
                                 .padding(2.dp),
                             uri = images.value[index].contentUri,
                             imageLoader = imageLoader,
-                            onClick = {
+                            onImageClick = {
+                                clickedIndex.intValue = index
+                                openDialog.value = true
+                            },
+                            onVideoClick = {
                                 clickedIndex.intValue = index
                                 openDialog.value = true
                             })
