@@ -3,7 +3,14 @@ package com.example.ydaynomore.ui
 import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -41,7 +48,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +80,7 @@ import io.sanghun.compose.video.RepeatMode
 import io.sanghun.compose.video.VideoPlayer
 import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
 import io.sanghun.compose.video.uri.VideoPlayerMediaItem
+import kotlinx.coroutines.coroutineScope
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -147,6 +158,7 @@ fun ActionScreen(
                 delButtonClickable = images.value.isNotEmpty(),
                 onDelButtonClicked = {
                     if (images.value.isNotEmpty()) {
+                        /* TODO ANIMATION? */
                         viewModel.markImage(pagerState.currentPage)
                     }
                 },
@@ -164,6 +176,9 @@ fun ActionScreen(
             return@Scaffold
         }
 
+        var dragOffset by remember { mutableStateOf(0f) }
+        var swipeScale by remember { mutableStateOf(1f) }
+
             HorizontalPager(
                 modifier = Modifier.padding(innerPadding),
                 state = pagerState,
@@ -174,7 +189,88 @@ fun ActionScreen(
 
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxSize().graphicsLayer {
+                            // Calculate the absolute offset for the current page from the
+                            // scroll position. We use the absolute value which allows us to mirror
+                            // any effects for both directions
+                            val pageOffset = (
+                                    (pagerState.currentPage - page)
+                                            + pagerState.currentPageOffsetFraction
+                                    ).absoluteValue
+
+                            // We animate the alpha, between 50% and 100%
+                            alpha = lerp(
+                                start = 0.4f,
+                                stop = 1f,
+                                fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                            )
+                            val scale = 1f - (pageOffset * .1f)
+                            scaleX = scale
+                            scaleY = scale
+
+                            scaleX = if (pageOffset != 0f) {
+                                scale
+                            } else if (pagerState.currentPage == page) {
+                                swipeScale
+                            } else {
+                                1f
+                            }
+                            scaleY = if (pageOffset != 0f) {
+                                scale
+                            } else if (pagerState.currentPage == page) {
+                                swipeScale
+                            } else {
+                                1f
+                            }
+
+                            if (pagerState.currentPage == page) {
+                                translationY = dragOffset
+                            }
+                        }.draggable(
+                            orientation = Orientation.Vertical,
+                            state = rememberDraggableState { delta ->
+                                // Update drag offset
+                                    dragOffset += delta
+                                if (dragOffset > 100f) dragOffset = 100f
+
+                                    // Calculate the scale based on drag distance
+                                    swipeScale = (1f - ((-dragOffset) / 1000f).coerceIn(0f, 1f))
+
+                            },
+                            onDragStopped = { velocity ->
+                                Log.v("YDNM", "DRAG $swipeScale, $dragOffset, $velocity")
+                                // If dragged far enough, dismiss the card
+                                if (dragOffset < -300f || velocity < -1000f) { // Threshold for dismissal
+                                    // Call the function to remove the item
+                                    coroutineScope {
+                                        animate(
+                                            initialValue = dragOffset,
+                                            targetValue = -1000f,
+                                            animationSpec = tween(durationMillis = 400)
+                                        ) { value, velocity ->
+                                            dragOffset = value
+                                            swipeScale = (1f - ((-dragOffset) / 1000f).coerceIn(0f, 1f))
+                                        }
+                                        dragOffset = 0f
+                                        swipeScale = 1f
+
+                                        pagerState.animateScrollToPage( pagerState.currentPage )
+
+                                        if (images.value.isNotEmpty()) {
+                                            var index = pagerState.currentPage
+                                            if(pagerState.currentPage > 0) {
+                                                index -= 1
+                                            }
+                                            viewModel.markImage(index)
+                                        }
+                                    }
+                                } else {
+                                    // Reset position and scale
+                                    dragOffset = 0f
+                                    swipeScale = 1f
+                                }
+                            }
+                        )
                         .padding(top = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -189,28 +285,7 @@ fun ActionScreen(
                     MediaPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .graphicsLayer {
-                                // Calculate the absolute offset for the current page from the
-                                // scroll position. We use the absolute value which allows us to mirror
-                                // any effects for both directions
-                                val pageOffset = (
-                                        (pagerState.currentPage - page)
-                                                + pagerState.currentPageOffsetFraction
-                                        ).absoluteValue
-
-                                // We animate the alpha, between 50% and 100%
-                                alpha = lerp(
-                                    start = 0.4f,
-                                    stop = 1f,
-                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
-                                )
-
-                                val scale = 1f - (pageOffset * .1f)
-                                scaleX = scale
-                                scaleY = scale
-
-                            }
-                            , uri = uri, imageLoader = imageLoader, onVideoClick = {
+                        , uri = uri, imageLoader = imageLoader, onVideoClick = {
                         context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
                             }
                     )

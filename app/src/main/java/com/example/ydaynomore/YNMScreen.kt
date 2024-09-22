@@ -56,12 +56,12 @@ fun YNMApp(
             ActionScreen (
                 viewModel = actionViewModel,
                 onNextButtonClicked = { navController.navigate(YNMScreen.Recycle.name)},
-                onBackButtonClicked = { navController.navigateUp() })
+                onBackButtonClicked = { navController.popBackStack() })
         }
         composable (route = YNMScreen.Recycle.name) {
             RecycleScreen(
                 actionViewModel = actionViewModel,
-                onBackButtonClicked = {navController.navigateUp()})
+                onBackButtonClicked = {navController.popBackStack()})
         }
     }
 }

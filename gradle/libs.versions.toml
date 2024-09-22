@@ -7,6 +7,7 @@ coilVideo = "2.7.0"
 coilVideoVersion = "3.0.0-alpha10"
 compose = "1.0.0-beta01"
 composeVideo = "1.2.0"
+foundation = "1.7.2"
 glide = "4.16.0"
 kotlin = "1.9.0"
 coreKtx = "1.13.1"
@@ -28,6 +29,7 @@ roomRuntime = "2.6.1"
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "foundation" }
 androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose" }
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx" }

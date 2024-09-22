@@ -6,6 +6,12 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.splineBasedDecay
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
@@ -41,10 +48,15 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
@@ -54,7 +66,11 @@ import com.example.ydaynomore.YNMApplication
 import com.example.ydaynomore.data.MediaStoreImage
 import com.example.ydaynomore.viewmodel.ActionViewModel
 import com.example.ydaynomore.viewmodel.RecycleViewModel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,8 +181,6 @@ fun RecycleScreen(
                             )
                         }
 
-                        /* TODO: 顺序存在问题 */
-
                         MediaPlayer(
                             modifier = Modifier
                                 .padding(2.dp),
@@ -194,6 +208,64 @@ fun RecycleScreen(
                     .fillMaxSize()
             )
     }
+}
+
+fun Modifier.swipeUpToDismiss(
+    onDismissed: () -> Unit
+): Modifier = composed {
+    val offsetY = remember { Animatable(0f) }
+    pointerInput(Unit) {
+
+        // Used to calculate fling decay.
+        val decay = splineBasedDecay<Float>(this)
+        // Use suspend functions for touch events and the Animatable.
+        coroutineScope {
+            while (true) {
+                val velocityTracker = VelocityTracker()
+                // Stop any ongoing animation.
+                offsetY.stop()
+                awaitPointerEventScope {
+                    // Detect a touch down event.
+                    val pointerId = awaitFirstDown().id
+
+                    verticalDrag(pointerId) { change ->
+                        launch {
+                            offsetY.snapTo(
+                                offsetY.value + change.positionChange().y
+                            )
+                        }
+                        velocityTracker.addPosition(
+                            change.uptimeMillis,
+                            change.position
+                        )
+                    }
+                }
+                // No longer receiving touch events. Prepare the animation.
+                val velocity = velocityTracker.calculateVelocity().y
+                val targetOffsetY = decay.calculateTargetValue(
+                    offsetY.value,
+                    velocity
+                )
+
+                offsetY.updateBounds(
+                    lowerBound = -size.height.toFloat(),
+                    upperBound = size.height.toFloat()
+                )
+                launch {
+                    if (targetOffsetY.absoluteValue <= size.height) {
+                        offsetY.animateTo(
+                            targetValue = 0f,
+                            initialVelocity = velocity
+                        )
+                    } else {
+                        offsetY.animateDecay(velocity, decay)
+                        onDismissed()
+                    }
+                }
+            }
+        }
+    }
+        .offset { IntOffset(0, offsetY.value.roundToInt()) }
 }
 
 @Preview(showBackground = true, showSystemUi = true)
