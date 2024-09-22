@@ -11,4 +11,6 @@
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
     <string name="happy_deleting">Happy Deleting</string>
+    <string name="congratulations">Congratulations!\nThere is nothing to delete.</string>
+    <string name="nothing_to_do">There is nothing to do.</string>
 </resources>

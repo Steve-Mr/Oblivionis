@@ -307,8 +307,6 @@ class ActionViewModel(
                 "${albumPath}/"
             )
 
-            Log.v("YDNM", "ARGS $selectionArgs")
-
             val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
             for (uri in uriList) {

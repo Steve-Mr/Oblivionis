@@ -1,42 +1,34 @@
 package com.example.ydaynomore.ui
 
+import android.content.res.Resources
 import android.net.Uri
 import android.provider.MediaStore
-import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeGesturesPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsEndWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,14 +46,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -69,14 +59,11 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.SimpleExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import com.example.ydaynomore.R
 import com.example.ydaynomore.viewmodel.ActionViewModel
-import com.example.ydaynomore.viewmodel.RecycleViewModel
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,8 +83,6 @@ fun ActionScreen(
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
-
-    val albums = viewModel.albums.collectAsState()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -132,7 +117,7 @@ fun ActionScreen(
                         BadgedBox(
                             modifier = Modifier.padding(end = 8.dp),
                             badge = { Badge (containerColor = badgeColor) { Text(text = marked.value.size.toString())}}) {
-                            IconButton(onClick = { onNextButtonClicked() }) {
+                            IconButton(onClick = { onNextButtonClicked() }, enabled = marked.value.isNotEmpty()) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_recycle),
                                     contentDescription = stringResource(id = R.string.go_to_recycle_screen)
@@ -160,55 +145,65 @@ fun ActionScreen(
 
     ) { innerPadding ->
 
-        HorizontalPager(
-            modifier = Modifier.padding(innerPadding),
-            state = pagerState,
-            contentPadding = PaddingValues(horizontal = 64.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            pageSpacing = 16.dp
-        ) { page ->
+        if (images.value.isEmpty()) {
 
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 16.dp),
-                contentAlignment = Alignment.Center) {
-                val uri = images.value[page].contentUri
+            PlaceHolder(modifier = Modifier.padding(innerPadding), stringResource = R.string.congratulations)
+            return@Scaffold
+        }
 
-                MediaPlayer(
+            HorizontalPager(
+                modifier = Modifier.padding(innerPadding),
+                state = pagerState,
+                contentPadding = PaddingValues(horizontal = 64.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                pageSpacing = 16.dp
+            ) { page ->
+
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            // Calculate the absolute offset for the current page from the
-                            // scroll position. We use the absolute value which allows us to mirror
-                            // any effects for both directions
-                            val pageOffset = (
-                                    (pagerState.currentPage - page)
-                                            + pagerState.currentPageOffsetFraction
-                                    ).absoluteValue
+                        .fillMaxSize()
+                        .padding(top = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
 
-                            // We animate the alpha, between 50% and 100%
-                            alpha = lerp(
-                                start = 0.5f,
-                                stop = 1f,
-                                fraction = 1f - pageOffset.coerceIn(0f, 1f)
-                            )
+                    val uri = images.value[page].contentUri
 
-                            shadowElevation = lerp(
-                                start = 0f,
-                                stop = 10f,
-                                fraction = 1f - pageOffset.coerceIn(0f, 1f)
-                            )
+                    MediaPlayer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                // Calculate the absolute offset for the current page from the
+                                // scroll position. We use the absolute value which allows us to mirror
+                                // any effects for both directions
+                                val pageOffset = (
+                                        (pagerState.currentPage - page)
+                                                + pagerState.currentPageOffsetFraction
+                                        ).absoluteValue
 
-                            // 设置圆角效果 (应用于阴影的边缘)
-                            shape = RoundedCornerShape(8.dp)  // 圆角半径
-                            clip = true  // 确保视图被剪切到圆角形状
-                        }, uri = uri)
+                                // We animate the alpha, between 50% and 100%
+                                alpha = lerp(
+                                    start = 0.5f,
+                                    stop = 1f,
+                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                )
+
+                                shadowElevation = lerp(
+                                    start = 0f,
+                                    stop = 10f,
+                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                )
+
+                                // 设置圆角效果 (应用于阴影的边缘)
+                                shape = RoundedCornerShape(8.dp)  // 圆角半径
+                                clip = true  // 确保视图被剪切到圆角形状
+                            }, uri = uri
+                    )
 
                     // TODO: placeholder for empty folder
 
-            }
+                }
 
-        }
+            }
     }
 }
 
@@ -241,14 +236,10 @@ fun ActionRow(
     onRollBackButtonClicked: () -> Unit,
     showRestore: Boolean
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
         Box(
-            modifier = Modifier.weight(2f),
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             if (showRestore) {
@@ -269,7 +260,9 @@ fun ActionRow(
             }
         }
 
-        Box(modifier = Modifier.weight(3f)) {
+        Box(modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp), contentAlignment = Alignment.Center) {
             Button(
                 onClick = onDelButtonClicked,
                 enabled = delButtonClickable,
@@ -285,7 +278,6 @@ fun ActionRow(
                     )
             }
         }
-    }
 }
 
 @Composable
@@ -360,6 +352,30 @@ fun Dialog(
             }
         }
     )
+}
+
+@Composable
+fun PlaceHolder(
+    modifier: Modifier,
+    stringResource: Int) {
+    Box(modifier = modifier
+        .fillMaxSize(), contentAlignment = Alignment.Center) {
+
+        ElevatedCard(elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .fillMaxHeight(0.3f)) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center // Center the Text inside the Box
+            ) {
+                Text(
+                    text = stringResource(id = stringResource),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }
 
 @Preview(

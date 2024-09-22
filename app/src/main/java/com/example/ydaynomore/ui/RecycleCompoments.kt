@@ -130,6 +130,11 @@ fun RecycleScreen(
 
         val clickedIndex = remember { mutableIntStateOf(-1) }
 
+        if (images.value.isEmpty()) {
+            PlaceHolder(modifier = Modifier.padding(innerPadding), stringResource = R.string.nothing_to_do)
+            return@Scaffold
+        }
+
         LazyVerticalStaggeredGrid(
                 columns = StaggeredGridCells.Fixed(3),
                 content = {
