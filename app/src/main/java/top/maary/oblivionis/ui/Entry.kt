@@ -107,7 +107,6 @@ fun EntryItem(
 
     Card(
         modifier = Modifier
-            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -116,6 +115,7 @@ fun EntryItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { onClick() }
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
