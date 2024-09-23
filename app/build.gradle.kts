@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ydaynomore"
+    namespace = "top.maary.oblivionis"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.ydaynomore"
+        applicationId = "top.maary.oblivionis"
         minSdk = 31
         targetSdk = 34
         versionCode = 1
