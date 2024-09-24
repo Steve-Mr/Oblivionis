@@ -272,9 +272,9 @@ fun ActionScreen(
 
                                         if (images.value.isNotEmpty()) {
                                             var index = pagerState.currentPage
-                                            if (pagerState.currentPage > 0) {
-                                                index -= 1
-                                            }
+//                                            if (pagerState.currentPage > 0) {
+//                                                index -= 1
+//                                            }
                                             viewModel.markImage(index)
                                         }
                                     }
