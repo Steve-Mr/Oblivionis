@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
@@ -35,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
@@ -58,7 +60,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -109,27 +113,27 @@ fun ActionScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
 
         topBar = {
             CenterAlignedTopAppBar(
-                modifier = Modifier.shadow(10.dp),
+//                modifier = Modifier.shadow(10.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f),
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
-                title = {
-                    Text(
-                        viewModel.albumPath.toString().substringAfterLast("/"),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
+                title = { },
                 navigationIcon = {
-                    IconButton(onClick = { onBackButtonClicked() }) {
+                    FilledTonalButton(onClick = { onBackButtonClicked() },
+                        modifier = Modifier.padding(start = 8.dp)) {
                         Icon(
+                            modifier = Modifier.padding(end = 8.dp),
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(id = R.string.back)
                         )
+                        Text(text = viewModel.albumPath.toString().substringAfterLast("/"),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
                     }
                 },
                 actions = {
@@ -138,16 +142,19 @@ fun ActionScreen(
                         } else {
                             BadgeDefaults.containerColor
                         }
+//                    FilledTonalButton(onClick = { onNextButtonClicked() }) {
                         BadgedBox(
                             modifier = Modifier.padding(end = 8.dp),
                             badge = { Badge (containerColor = badgeColor) { Text(text = marked.value.size.toString())}}) {
-                            IconButton(onClick = { onNextButtonClicked() }, enabled = marked.value.isNotEmpty()) {
+                            FilledTonalButton(onClick = { onNextButtonClicked() }, enabled = marked.value.isNotEmpty()) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_recycle),
                                     contentDescription = stringResource(id = R.string.go_to_recycle_screen)
                                 )
-                            }
+//                            }
                         }
+                    }
+
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -178,9 +185,11 @@ fun ActionScreen(
 
         var dragOffset by remember { mutableStateOf(0f) }
         var swipeScale by remember { mutableStateOf(1f) }
+        val density = LocalDensity.current.density // 获取屏幕密度
+        val configuration =  LocalConfiguration.current
 
             HorizontalPager(
-                modifier = Modifier.padding(innerPadding),
+//                modifier = Modifier.padding(innerPadding),
                 state = pagerState,
                 contentPadding = PaddingValues(horizontal = 64.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -189,7 +198,8 @@ fun ActionScreen(
 
                 Box(
                     modifier = Modifier
-                        .fillMaxSize().graphicsLayer {
+                        .fillMaxSize()
+                        .graphicsLayer {
                             // Calculate the absolute offset for the current page from the
                             // scroll position. We use the absolute value which allows us to mirror
                             // any effects for both directions
@@ -226,15 +236,16 @@ fun ActionScreen(
                             if (pagerState.currentPage == page) {
                                 translationY = dragOffset
                             }
-                        }.draggable(
+                        }
+                        .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
                                 // Update drag offset
-                                    dragOffset += delta
+                                dragOffset += delta
                                 if (dragOffset > 100f) dragOffset = 100f
 
-                                    // Calculate the scale based on drag distance
-                                    swipeScale = (1f - ((-dragOffset) / 1000f).coerceIn(0f, 1f))
+                                // Calculate the scale based on drag distance
+                                swipeScale = (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
 
                             },
                             onDragStopped = { velocity ->
@@ -243,22 +254,25 @@ fun ActionScreen(
                                 if (dragOffset < -300f || velocity < -1000f) { // Threshold for dismissal
                                     // Call the function to remove the item
                                     coroutineScope {
+                                        val screenHeight = with(density) { configuration.screenHeightDp.dp.value * density.absoluteValue }
+                                        val targetValue = -screenHeight // 将目标值设置为屏幕上边缘
                                         animate(
                                             initialValue = dragOffset,
-                                            targetValue = -1000f,
+                                            targetValue = targetValue,
                                             animationSpec = tween(durationMillis = 400)
                                         ) { value, velocity ->
                                             dragOffset = value
-                                            swipeScale = (1f - ((-dragOffset) / 1000f).coerceIn(0f, 1f))
+                                            swipeScale =
+                                                (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
                                         }
                                         dragOffset = 0f
                                         swipeScale = 1f
 
-                                        pagerState.animateScrollToPage( pagerState.currentPage )
+                                        pagerState.animateScrollToPage(pagerState.currentPage)
 
                                         if (images.value.isNotEmpty()) {
                                             var index = pagerState.currentPage
-                                            if(pagerState.currentPage > 0) {
+                                            if (pagerState.currentPage > 0) {
                                                 index -= 1
                                             }
                                             viewModel.markImage(index)

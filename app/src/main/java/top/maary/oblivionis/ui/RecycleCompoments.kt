@@ -90,6 +90,8 @@ fun RecycleScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -99,8 +101,9 @@ fun RecycleScreen(
                 ),
                 navigationIcon = {
                     FilledTonalButton(onClick = { onBackButtonClicked() },
-                        modifier = Modifier.padding(start = 16.dp)) {
+                        modifier = Modifier.padding(start = 8.dp)) {
                         Icon(
+                            modifier = Modifier.padding(end = 8.dp),
                             painter = painterResource(
                                 id = R.drawable.ic_close),
                             contentDescription = stringResource(
@@ -123,7 +126,7 @@ fun RecycleScreen(
                         )
                     }
                     FilledTonalButton(onClick = { openDialog.value = true },
-                        modifier = Modifier.padding(end = 16.dp)) {
+                        modifier = Modifier.padding(end = 8.dp)) {
                         Text(stringResource(id = R.string.deleteAll))
                     }
                 },

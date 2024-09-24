@@ -51,6 +51,8 @@ fun EntryScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+
         topBar = {
             LargeTopAppBar(
                 modifier = Modifier.fillMaxHeight(0.3f).shadow(10.dp),
@@ -109,7 +111,7 @@ fun EntryItem(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         )
     ) {
         Row(

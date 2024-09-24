@@ -270,6 +270,7 @@ class ActionViewModel(
         _images.update { currentList ->
             currentList.filter { !it.isMarked }
         }
+        _lastMarked.value = null
         databaseRemoveAll()
     }
 
