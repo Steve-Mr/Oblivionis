@@ -13,5 +13,5 @@
     <string name="happy_deleting">Happy Deleting</string>
     <string name="congratulations">Congratulations!\nThere is nothing to delete.</string>
     <string name="nothing_to_do">There is nothing to do.</string>
-    <string name="choose_app">Choose an app to open this media.</string>
+    <string name="choose_app">Choose an app to open this media</string>
 </resources>

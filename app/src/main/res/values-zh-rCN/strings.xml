@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Oblivionis</string>
+    <string name="deleteAllConfirmation">此操作将删除此页面上所有的媒体文件</string>
+    <string name="restoreConfirmation">这个媒体文件将会被恢复。</string>
+    <string name="close">关闭</string>
+    <string name="deleteAll">全部删除</string>
+    <string name="go_to_recycle_screen">进入回收站</string>
+    <string name="back">返回上一页</string>
+    <string name="restore_last_deleted">恢复上一张</string>
+    <string name="mark_this_to_delete">标记这张图片以删除。</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="happy_deleting">消消乐！</string>
+    <string name="congratulations">恭喜！清理干净了。</string>
+    <string name="nothing_to_do">无事可做。</string>
+    <string name="choose_app">选择应用打开</string>
+</resources>
