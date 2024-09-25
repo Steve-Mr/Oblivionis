@@ -87,7 +87,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: WallpaperTunnel-arm64-v8a.apk
+          asset_name: Oblivionis-arm64-v8a.apk
           asset_path: ${{ env.APK_FILE }}
           asset_content_type: application/zip
 
@@ -97,7 +97,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: WallpaperTunnel-armeabi-v7a.apk
+          asset_name: Oblivionis-armeabi-v7a.apk
           asset_path: ${{ env.APK_FILE_ARMV7 }}
           asset_content_type: application/zip
 
@@ -107,7 +107,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: WallpaperTunnel-x86_64.apk
+          asset_name: Oblivionis-x86_64.apk
           asset_path: ${{ env.APK_FILE_X64 }}
           asset_content_type: application/zip
 
@@ -117,7 +117,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: WallpaperTunnel-x86.apk
+          asset_name: Oblivionis-x86.apk
           asset_path: ${{ env.APK_FILE_X86 }}
           asset_content_type: application/zip
 
@@ -156,7 +156,7 @@ jobs:
         run: |
           chmod +x telegram-bot-api-binary
           ./telegram-bot-api-binary --api-id=21724 --api-hash=3e0cb5efcd52300aec5994fdfc5bdc16 --local 2>&1 > /dev/null &
-          curl https://raw.githubusercontent.com/Steve-Mr/WallpaperTunnel/master/.github/scripts/upload.py -o uploadCI.py
+          curl https://raw.githubusercontent.com/Steve-Mr/Oblivionis/master/.github/scripts/upload.py -o uploadCI.py
           python uploadCI.py > upload.txt
           cat upload.txt
         env:
