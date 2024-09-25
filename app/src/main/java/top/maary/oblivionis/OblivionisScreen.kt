@@ -28,6 +28,7 @@ fun OblivionisApp(
     ){
         composable (route = OblivionisScreen.Welcome.name) {
             WelcomeScreen (onPermissionFinished = {
+                actionViewModel.loadAlbums()
                 navController.navigate(OblivionisScreen.Entry.name) {
                     popUpTo(OblivionisScreen.Welcome.name) {
                         inclusive = true // 将 WelcomeScreen 从栈中移除

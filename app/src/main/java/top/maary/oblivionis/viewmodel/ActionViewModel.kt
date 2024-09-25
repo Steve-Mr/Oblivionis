@@ -113,7 +113,7 @@ class ActionViewModel(
     private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> get() = _albums
 
-    private fun loadAlbums() {
+    fun loadAlbums() {
         viewModelScope.launch(Dispatchers.IO) {
             val albumList = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
             _albums.value = albumList
@@ -404,6 +404,7 @@ class ActionViewModel(
 
     init {
         loadAlbums()
+        /* TODO 获取权限 */
     }
 
     fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {

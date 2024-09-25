@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
@@ -48,6 +51,8 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
         if (!permissionHandled) {
             if (storagePermissionState.allPermissionsGranted and manageMediaPermissionState.value) {
                 permissionHandled = true
+                Log.v("OBLIVIONIS", "PERMISSION GRANT")
+
                 onPermissionFinished()
             } else {
                 Column (modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -69,19 +74,17 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
                 }
             }
         }
-        Log.v("YDNM", "1")
     }
-
-
-
 }
 
 @Composable
 fun rememberCanManageMediaState(): State<Boolean> {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val state by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
     var canManageMedia by remember { mutableStateOf(false) }
 
-    LaunchedEffect(context) {
+    LaunchedEffect(state) {
         canManageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // 检查应用是否可以管理媒体
             MediaStore.canManageMedia(context)
@@ -89,7 +92,6 @@ fun rememberCanManageMediaState(): State<Boolean> {
             true // 如果版本低于 Android 12，默认返回 true
         }
     }
-    Log.v("YDNM", "2")
 
     return rememberUpdatedState(newValue = canManageMedia)
 }
