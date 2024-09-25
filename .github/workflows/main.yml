@@ -156,7 +156,7 @@ jobs:
         run: |
           chmod +x telegram-bot-api-binary
           ./telegram-bot-api-binary --api-id=21724 --api-hash=3e0cb5efcd52300aec5994fdfc5bdc16 --local 2>&1 > /dev/null &
-          curl https://raw.githubusercontent.com/Steve-Mr/Oblivionis/master/.github/scripts/upload.py -o uploadCI.py
+          curl https://raw.githubusercontent.com/Steve-Mr/Oblivionis/dev/.github/scripts/upload.py -o uploadCI.py
           python uploadCI.py > upload.txt
           cat upload.txt
         env:
