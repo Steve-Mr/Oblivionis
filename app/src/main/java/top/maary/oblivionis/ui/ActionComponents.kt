@@ -6,14 +6,24 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,7 +41,9 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonElevation
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
@@ -42,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -58,16 +71,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -85,6 +109,8 @@ import io.sanghun.compose.video.VideoPlayer
 import io.sanghun.compose.video.controller.VideoPlayerControllerConfig
 import io.sanghun.compose.video.uri.VideoPlayerMediaItem
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +136,10 @@ fun ActionScreen(
             add(VideoFrameDecoder.Factory())
         }
         .build()
+
+    val openDialog = remember {
+        mutableStateOf(false)
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -142,7 +172,6 @@ fun ActionScreen(
                         } else {
                             BadgeDefaults.containerColor
                         }
-//                    FilledTonalButton(onClick = { onNextButtonClicked() }) {
                         BadgedBox(
                             modifier = Modifier.padding(end = 8.dp),
                             badge = { Badge (containerColor = badgeColor) { Text(text = marked.value.size.toString())}}) {
@@ -151,7 +180,6 @@ fun ActionScreen(
                                     painter = painterResource(id = R.drawable.ic_recycle),
                                     contentDescription = stringResource(id = R.string.go_to_recycle_screen)
                                 )
-//                            }
                         }
                     }
 
@@ -160,6 +188,15 @@ fun ActionScreen(
             )
         },
         bottomBar = {
+            if (openDialog.value) {
+                Dialog(
+                    onDismissRequest = { openDialog.value = false },
+                    onConfirmation = {
+                        viewModel.markAllImages()
+                        openDialog.value = false },
+                    dialogText = stringResource(id = R.string.deleteAllConfirmation)
+                )
+            }
             ActionRow(
                 modifier = Modifier.navigationBarsPadding(),
                 delButtonClickable = images.value.isNotEmpty(),
@@ -168,6 +205,9 @@ fun ActionScreen(
                         /* TODO ANIMATION? Long press listener with animation */
                         viewModel.markImage(pagerState.currentPage)
                     }
+                },
+                onDelButtonLongClicked = {
+                    openDialog.value = true
                 },
                 onRollBackButtonClicked = {
                     viewModel.unMarkLastImage()
@@ -254,7 +294,8 @@ fun ActionScreen(
                                 if (dragOffset < -300f || velocity < -1000f) { // Threshold for dismissal
                                     // Call the function to remove the item
                                     coroutineScope {
-                                        val screenHeight = with(density) { configuration.screenHeightDp.dp.value * density.absoluteValue }
+                                        val screenHeight =
+                                            with(density) { configuration.screenHeightDp.dp.value * density.absoluteValue }
                                         val targetValue = -screenHeight // 将目标值设置为屏幕上边缘
                                         animate(
                                             initialValue = dragOffset,
@@ -337,6 +378,7 @@ fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
 fun ActionRow(
     modifier: Modifier,
     delButtonClickable: Boolean = true,
+    onDelButtonLongClicked: () -> Unit,
     onDelButtonClicked: () -> Unit,
     onRollBackButtonClicked: () -> Unit,
     showRestore: Boolean
@@ -352,7 +394,8 @@ fun ActionRow(
                     onClick = onRollBackButtonClicked,
                     shape = CircleShape,
                     contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier
+                        .size(48.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(),
                     elevation = ButtonDefaults.buttonElevation(10.dp)
                 ) {
@@ -365,17 +408,45 @@ fun ActionRow(
             }
         }
 
+
+    val interactionSource = remember { MutableInteractionSource() }
+
+    val viewConfiguration = LocalViewConfiguration.current
+
+
+    LaunchedEffect(interactionSource) {
+        var isLongClick = false
+
+        interactionSource.interactions.collectLatest { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> {
+                    isLongClick = false
+                    delay(viewConfiguration.longPressTimeoutMillis)
+                    isLongClick = true
+                    onDelButtonLongClicked()
+                }
+
+                is PressInteraction.Release -> {
+                    if (isLongClick.not()) {
+                        onDelButtonClicked()
+                    }
+                }
+            }
+        }
+    }
+
         Box(modifier = modifier
             .fillMaxWidth()
             .padding(16.dp), contentAlignment = Alignment.Center) {
             Button(
-                onClick = onDelButtonClicked,
+                onClick = { },
                 enabled = delButtonClickable,
                 shape = CircleShape,
                 contentPadding = PaddingValues(0.dp),
                 modifier = Modifier.size(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = BadgeDefaults.containerColor),
-                elevation = ButtonDefaults.buttonElevation(10.dp)
+                elevation = ButtonDefaults.buttonElevation(10.dp),
+                interactionSource = interactionSource
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_close),

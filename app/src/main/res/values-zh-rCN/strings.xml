@@ -15,4 +15,5 @@
     <string name="congratulations">恭喜！清理干净了。</string>
     <string name="nothing_to_do">无事可做。</string>
     <string name="choose_app">选择应用打开</string>
+    <string name="restoreAllConfirmation">此操作将恢复此页面上的所有媒体文件</string>
 </resources>

@@ -174,6 +174,7 @@ class ActionViewModel(
         viewModelScope.launch {
             performDeleteImageList(images)
             clearImages()
+            loadAlbums()
         }
     }
 
@@ -404,7 +405,6 @@ class ActionViewModel(
 
     init {
         loadAlbums()
-        /* TODO 获取权限 */
     }
 
     fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
@@ -415,12 +415,37 @@ class ActionViewModel(
         imageRepository.unmark(image.copy(isMarked = false))
     }
 
-    fun databaseRemoveAll() = viewModelScope.launch {
-        imageRepository.removeAll()
+    fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
+        images.forEach {
+            imageRepository.mark(it.copy(isMarked = false))
+        }
     }
+
+    fun databaseRemoveAll() = databaseUnmarkAll(_images.value)
 
     fun removeId(id: Long) = viewModelScope.launch {
         imageRepository.removeId(id)
+    }
+
+    fun markAllImages() {
+        databaseMarkAll(images = _images.value)
+        _images.update { currentList ->
+            currentList.map { it.copy(isMarked = true) }
+        }
+    }
+
+    fun unMarkAll() {
+        databaseUnmarkAll(_images.value)
+        _images.update { currentList ->
+            currentList.map { it.copy(isMarked = false) }
+        }
+        _lastMarked.value = null
+    }
+
+    private fun databaseUnmarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
+        images.forEach {
+            imageRepository.unmark(it.copy(isMarked = false))
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

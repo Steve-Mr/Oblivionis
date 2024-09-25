@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -89,6 +90,7 @@ fun RecycleScreen(
         }
     }
 
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
 
@@ -132,6 +134,25 @@ fun RecycleScreen(
                 },
                 title = {}
             )
+        },
+        floatingActionButton = {
+            val openDialog = remember {
+                mutableStateOf(false)
+            }
+            FloatingActionButton(onClick = { openDialog.value = true }) {
+                if (openDialog.value) {
+                    Dialog(
+                        onDismissRequest = { openDialog.value = false },
+                        onConfirmation = {
+                            actionViewModel.unMarkAll()
+                            openDialog.value = false },
+                        dialogText = stringResource(id = R.string.restoreAllConfirmation)
+                    )
+                }
+                Icon(painter = painterResource(id = R.drawable.ic_restore_all), contentDescription = stringResource(
+                    id = R.string.restoreAllConfirmation
+                ))
+            }
         }
     ) { innerPadding ->
         val openDialog = remember {
