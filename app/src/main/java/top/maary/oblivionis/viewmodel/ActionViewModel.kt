@@ -118,15 +118,12 @@ class ActionViewModel(
             val albumList = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
             _albums.value = albumList
         }
-        Log.v("YDNM", "LOAD ALBUMS")
 
     }
 
     // Function to fetch album names and paths from MediaStore for both images and videos
     private fun getAlbumsFromMediaStore(contentResolver: ContentResolver): List<Album> {
-//        val albums = mutableListOf<Album>()
         val albumMap = mutableMapOf<String, Album>()
-        Log.v("YDNM", "ALBUMS FUNCTION")
 
         // Query both Images and Videos
         val uriList = listOf(
@@ -155,8 +152,8 @@ class ActionViewModel(
                 val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
 
                 while (cursor.moveToNext()) {
-                    val name = cursor.getString(nameColumn)
-                    val path = File(cursor.getString(pathColumn)).parent!!.replace("/storage/emulated/0/", "")
+                    val name = cursor.getString(nameColumn) ?: ""
+                    val path = File(cursor.getString(pathColumn)).parent!!.replace("/storage/emulated/0/", "").replace("/storage/emulated/0", "")
                     // Check if this album (BUCKET_ID) is already in the map
                     val album = albumMap[path]
                     if (album == null) {
@@ -166,13 +163,10 @@ class ActionViewModel(
                         // Increment the media count for this album
                         albumMap[path] = album.copy(mediaCount = album.mediaCount + 1)
                     }
-//                    albums.add(Album(name, path))
-                    Log.v("YDNM", "CURSOR $name")
                 }
             }
         }
 
-//        return albums.distinctBy { it.path } // Ensure no duplicates
         return albumMap.values.toList()
     }
 
@@ -308,6 +302,8 @@ class ActionViewModel(
                 "${albumPath}/"
             )
 
+            Log.v("OBLIVIONIS", "$selection, ${selectionArgs[0]}")
+
             val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
             for (uri in uriList) {
@@ -407,7 +403,6 @@ class ActionViewModel(
     }
 
     init {
-//        loadImages()
         loadAlbums()
     }
 
