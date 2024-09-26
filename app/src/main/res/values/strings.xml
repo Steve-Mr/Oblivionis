@@ -25,4 +25,5 @@
     <string name="permission_manage_media_detail">This permission allows Oblivionis to manage your photos and videos.\nWithout this permission the system will ask for confirmation when deleting media.</string>
     <string name="finish_setting">Finish permission settings.</string>
     <string name="welcome">Welcome</string>
+    <string name="settings">Settings</string>
 </resources>

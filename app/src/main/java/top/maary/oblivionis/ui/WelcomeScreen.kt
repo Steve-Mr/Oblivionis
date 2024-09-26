@@ -140,12 +140,9 @@ fun rememberCanManageMediaState(): State<Boolean> {
     var canManageMedia by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
-        canManageMedia = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // 检查应用是否可以管理媒体
+        canManageMedia =
+                // 检查应用是否可以管理媒体
             MediaStore.canManageMedia(context)
-        } else {
-            true // 如果版本低于 Android 12，默认返回 true
-        }
     }
 
     return rememberUpdatedState(newValue = canManageMedia)
