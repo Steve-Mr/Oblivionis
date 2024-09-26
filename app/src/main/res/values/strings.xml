@@ -15,4 +15,14 @@
     <string name="nothing_to_do">There is nothing to do.</string>
     <string name="choose_app">Choose an app to open this media</string>
     <string name="restoreAllConfirmation">This action will restore all the media here.</string>
+    <string name="permission_media">Read Media</string>
+    <string name="permission_manage_media">Manage Media</string>
+    <string name="is_optional">Optional</string>
+    <string name="not_optional">Necessary</string>
+    <string name="grant">Grant</string>
+    <string name="granted">Granted</string>
+    <string name="permission_media_detail">This permission allows Oblivionis to read your photos and videos.</string>
+    <string name="permission_manage_media_detail">This permission allows Oblivionis to manage your photos and videos.\nWithout this permission the system will ask for confirmation when deleting media.</string>
+    <string name="finish_setting">Finish permission settings.</string>
+    <string name="welcome">Welcome</string>
 </resources>
