@@ -147,7 +147,6 @@ fun ActionScreen(
 
         topBar = {
             CenterAlignedTopAppBar(
-//                modifier = Modifier.shadow(10.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f),
                     titleContentColor = MaterialTheme.colorScheme.primary,
@@ -320,6 +319,9 @@ fun ActionScreen(
                                         }
                                     }
                                 } else {
+                                    if (dragOffset == 100f) {
+                                        /* TODO MARK DO NOT DELETE */
+                                    }
                                     // Reset position and scale
                                     dragOffset = 0f
                                     swipeScale = 1f
