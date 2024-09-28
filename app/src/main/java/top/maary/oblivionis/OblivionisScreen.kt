@@ -1,16 +1,20 @@
 package top.maary.oblivionis
 
-import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import top.maary.oblivionis.data.PreferenceRepository
 import top.maary.oblivionis.ui.ActionScreen
 import top.maary.oblivionis.ui.EntryScreen
 import top.maary.oblivionis.ui.RecycleScreen
@@ -28,20 +32,38 @@ fun OblivionisApp(
     )
 ) {
 
+    val context = LocalContext.current
+    val dataStore = PreferenceRepository(context)
+    val scope = rememberCoroutineScope()
+
+    val permissionGranted = runBlocking { dataStore.permissionGranted.first() }
+    val isReWelcome = dataStore.isReWelcome.collectAsState(initial = false)
+
     val welcomeScreenNextDest = remember { mutableStateOf(OblivionisScreen.Entry.name) }
+
+    fun welcomePermissionBasicLogic() {
+        scope.launch { dataStore.setPermissionGranted(true) }
+        actionViewModel.loadAlbums()
+        navController.navigate(welcomeScreenNextDest.value) {
+            popUpTo(OblivionisScreen.Welcome.name) {
+                inclusive = true // 将 WelcomeScreen 从栈中移除
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = OblivionisScreen.Welcome.name,
+        startDestination =
+        if (permissionGranted) OblivionisScreen.Entry.name
+                else OblivionisScreen.Welcome.name,
     ){
         composable (route = OblivionisScreen.Welcome.name) {
             WelcomeScreen (onPermissionFinished = {
-                actionViewModel.loadAlbums()
-                navController.navigate(welcomeScreenNextDest.value) {
-                    popUpTo(OblivionisScreen.Welcome.name) {
-                        inclusive = true // 将 WelcomeScreen 从栈中移除
-                    }
-            } })
+                if (isReWelcome.value) return@WelcomeScreen
+                welcomePermissionBasicLogic()
+            } , onFabClicked = {
+                welcomePermissionBasicLogic()
+            })
         }
         composable (route = OblivionisScreen.Entry.name) {
             EntryScreen(
@@ -66,6 +88,7 @@ fun OblivionisApp(
         composable (route = OblivionisScreen.Settings.name) {
             SettingsScreen(
                 onReWelcomeClick = {
+                    scope.launch { dataStore.setReWelcome(true) }
                     welcomeScreenNextDest.value = OblivionisScreen.Settings.name
                     navController.navigate(OblivionisScreen.Welcome.name) },
                 onBackButtonClicked = { navController.popBackStack() }

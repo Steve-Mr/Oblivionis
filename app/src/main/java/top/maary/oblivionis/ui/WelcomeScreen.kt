@@ -49,10 +49,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import top.maary.oblivionis.R
+import top.maary.oblivionis.data.PreferenceRepository
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun WelcomeScreen(onPermissionFinished: () -> Unit) {
+fun WelcomeScreen(
+    onPermissionFinished: () -> Unit,
+    onFabClicked: () -> Unit) {
     val context = LocalContext.current
 
     val storagePermissionState =
@@ -64,7 +67,7 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
 
     val manageMediaPermissionState = rememberCanManageMediaState()
 
-    var permissionHandled by remember { mutableStateOf(false) }
+//    var permissionHandled by remember { mutableStateOf(false) }
 
     Scaffold (
         topBar = {
@@ -85,7 +88,7 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
         },
         floatingActionButton = {
             if (storagePermissionState.allPermissionsGranted) {
-                FloatingActionButton(onClick = { onPermissionFinished() }) {
+                FloatingActionButton(onClick = { onFabClicked() }) {
                     Icon(painter = painterResource(R.drawable.ic_continue),
                         contentDescription = stringResource(R.string.finish_setting))
                 }
@@ -93,11 +96,9 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
         }
     ) { innerPadding ->
 
-        if (!permissionHandled) {
             if (storagePermissionState.allPermissionsGranted and manageMediaPermissionState.value) {
-                permissionHandled = true
                 onPermissionFinished()
-            } else {
+            }
                 LazyColumn (modifier = Modifier.fillMaxWidth().padding(innerPadding),
                     horizontalAlignment = Alignment.CenterHorizontally){
                     item {
@@ -127,9 +128,9 @@ fun WelcomeScreen(onPermissionFinished: () -> Unit) {
                     }
 
                 }
-            }
+
         }
-    }
+
 }
 
 @Composable
