@@ -1,5 +1,6 @@
 package top.maary.oblivionis
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,7 @@ import top.maary.oblivionis.ui.RecycleScreen
 import top.maary.oblivionis.ui.WelcomeScreen
 import top.maary.oblivionis.ui.screen.SettingsScreen
 import top.maary.oblivionis.viewmodel.ActionViewModel
+import top.maary.oblivionis.viewmodel.NotificationViewModel
 
 enum class OblivionisScreen() { Welcome, Entry, Action, Recycle, Settings }
 
@@ -29,7 +31,8 @@ fun OblivionisApp(
     navController: NavHostController = rememberNavController(),
     actionViewModel: ActionViewModel = viewModel(
         factory = ActionViewModel.Factory
-    )
+    ),
+    notificationViewModel: NotificationViewModel = viewModel()
 ) {
 
     val context = LocalContext.current
@@ -37,6 +40,7 @@ fun OblivionisApp(
     val scope = rememberCoroutineScope()
 
     val permissionGranted = runBlocking { dataStore.permissionGranted.first() }
+
     val isReWelcome = dataStore.isReWelcome.collectAsState(initial = false)
 
     val welcomeScreenNextDest = remember { mutableStateOf(OblivionisScreen.Entry.name) }
@@ -44,6 +48,7 @@ fun OblivionisApp(
     fun welcomePermissionBasicLogic() {
         scope.launch { dataStore.setPermissionGranted(true) }
         actionViewModel.loadAlbums()
+        Log.v("OBLIVIONIS", "PERMISSION ${runBlocking { dataStore.permissionGranted.first() }}")
         navController.navigate(welcomeScreenNextDest.value) {
             popUpTo(OblivionisScreen.Welcome.name) {
                 inclusive = true // 将 WelcomeScreen 从栈中移除
@@ -54,10 +59,16 @@ fun OblivionisApp(
     NavHost(
         navController = navController,
         startDestination =
-        if (permissionGranted) OblivionisScreen.Entry.name
+        if (runBlocking { dataStore.permissionGranted.first() }) {
+            Log.v("OBLIVIONIS", "GO TO ENTRY")
+
+            OblivionisScreen.Entry.name
+        }
                 else OblivionisScreen.Welcome.name,
     ){
         composable (route = OblivionisScreen.Welcome.name) {
+            Log.v("OBLIVIONIS", "PERMISSION 2")
+
             WelcomeScreen (onPermissionFinished = {
                 if (isReWelcome.value) return@WelcomeScreen
                 welcomePermissionBasicLogic()
@@ -83,6 +94,7 @@ fun OblivionisApp(
         composable (route = OblivionisScreen.Recycle.name) {
             RecycleScreen(
                 actionViewModel = actionViewModel,
+                notificationViewModel = notificationViewModel,
                 onBackButtonClicked = {navController.popBackStack()})
         }
         composable (route = OblivionisScreen.Settings.name) {
@@ -91,7 +103,8 @@ fun OblivionisApp(
                     scope.launch { dataStore.setReWelcome(true) }
                     welcomeScreenNextDest.value = OblivionisScreen.Settings.name
                     navController.navigate(OblivionisScreen.Welcome.name) },
-                onBackButtonClicked = { navController.popBackStack() }
+                onBackButtonClicked = { navController.popBackStack() },
+                notificationViewModel = notificationViewModel
             )
         }
     }

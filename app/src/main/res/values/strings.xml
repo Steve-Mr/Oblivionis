@@ -26,4 +26,21 @@
     <string name="finish_setting">Finish permission settings.</string>
     <string name="welcome">Welcome</string>
     <string name="settings">Settings</string>
+    <string name="notification">Notification</string>
+    <string name="notification_description">Enable periodic notifications on clearing media.</string>
+    <string name="notification_interval">Notification interval</string>
+    <string name="notification_interval_description">The time between two notifications</string>
+    <string name="d30">30 Days</string>
+    <string name="d15">15 Days</string>
+    <string name="d45">45 Days</string>
+    <string name="d60">60 Days</string>
+    <string name="notification_interval_fixed">Fixed notification time</string>
+    <string name="notification_interval_fixed_description">Set the reminder time to either a fixed period or based on your last cleanup time.</string>
+    <string name="select_start_date_description">Choose the date for each notification to occur every month.</string>
+    <string name="select_start_date">Notification date</string>
+    <string name="notfication_time">Notification time</string>
+    <string name="restart_permission">Reopen welcome screen</string>
+    <string name="restart_permission_description">Review the permission settings.</string>
+    <string name="notfication_channel_monthly">Clear</string>
+    <string name="time_to_clear">Time to clear media</string>
 </resources>

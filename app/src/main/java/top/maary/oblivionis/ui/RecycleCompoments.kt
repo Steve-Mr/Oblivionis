@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -52,15 +53,25 @@ import coil3.video.VideoFrameDecoder
 import top.maary.oblivionis.R
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import top.maary.oblivionis.data.PreferenceRepository
+import top.maary.oblivionis.viewmodel.NotificationViewModel
+import java.util.Calendar
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecycleScreen(
-    actionViewModel: ActionViewModel = viewModel(),
+    actionViewModel: ActionViewModel,
+    notificationViewModel: NotificationViewModel,
     onBackButtonClicked: () -> Unit) {
+
+    val context = LocalContext.current
+    val dataStore = PreferenceRepository(context)
+    val scope = rememberCoroutineScope()
 
     val images = actionViewModel.markedImages.collectAsState(initial = emptyList())
 
@@ -122,6 +133,21 @@ fun RecycleScreen(
                         Dialog(
                             onDismissRequest = { openDialog.value = false },
                             onConfirmation = {
+                                if (runBlocking { !dataStore.intervalStartFixed.first() }){
+                                    scope.launch {
+                                        val calendar = Calendar.getInstance()
+                                        val notificationTime = runBlocking { dataStore.notificationTime.first() }
+                                        val timeParts = notificationTime.split(":").map { it.toInt() }
+                                        dataStore.setIntervalStart(calendar.get(Calendar.DAY_OF_MONTH))
+                                        notificationViewModel.scheduleNotification(
+                                            date = calendar.get(Calendar.DAY_OF_MONTH),
+                                            hour = timeParts[0],
+                                            minute = timeParts[1],
+                                            interval = runBlocking { dataStore.notificationInterval.first().toLong() }
+                                        )
+                                    }
+                                }
+
                                 actionViewModel.deleteImages(images.value)
                                 openDialog.value = false },
                             dialogText = stringResource(id = R.string.deleteAllConfirmation)
@@ -275,8 +301,8 @@ fun Modifier.swipeUpToDismiss(
         .offset { IntOffset(0, offsetY.value.roundToInt()) }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun RecycleScreenPreview() {
-    RecycleScreen(onBackButtonClicked = {})
-}
+//@Preview(showBackground = true, showSystemUi = true)
+//@Composable
+//fun RecycleScreenPreview() {
+//    RecycleScreen(onBackButtonClicked = {})
+//}

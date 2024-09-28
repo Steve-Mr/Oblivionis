@@ -96,9 +96,10 @@ fun WelcomeScreen(
         }
     ) { innerPadding ->
 
-            if (storagePermissionState.allPermissionsGranted and manageMediaPermissionState.value) {
-                onPermissionFinished()
-            }
+//            if (storagePermissionState.allPermissionsGranted and manageMediaPermissionState.value) {
+//                Log.v("OBLIVIONIS", "PERMISSION 1")
+//                onPermissionFinished()
+//            }
                 LazyColumn (modifier = Modifier.fillMaxWidth().padding(innerPadding),
                     horizontalAlignment = Alignment.CenterHorizontally){
                     item {

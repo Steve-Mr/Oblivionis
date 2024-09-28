@@ -1,11 +1,13 @@
 package top.maary.oblivionis.data
 
 import android.content.Context
+import androidx.compose.ui.res.stringResource
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.map
 
@@ -16,6 +18,9 @@ class PreferenceRepository(private val context: Context) {
         val RE_PERMISSION = booleanPreferencesKey("RE_PERMISSION_PROCESS")
         val NOTIFICATION_ENABLED = booleanPreferencesKey("NOTIFICATION_ENABLED")
         val NOTIFICATION_INTERVAL = intPreferencesKey("NOTIFICATION_INTERVAL")
+        val NOTIFICATION_INTERVAL_CAL_FIXED = booleanPreferencesKey("NOTIFICATION_INTERVAL_CAL_FIXED")
+        val NOTIFICATION_INTERVAL_START = intPreferencesKey("NOTIFICATION_INTERVAL_START")
+        val NOTIFICATION_TIME = stringPreferencesKey("NOTFICATION_TIME")
     }
 
     val permissionGranted = context.dataStore.data.map { preferences ->
@@ -58,5 +63,35 @@ class PreferenceRepository(private val context: Context) {
         }
     }
 
+    val intervalStartFixed = context.dataStore.data.map { preferences ->
+        preferences[NOTIFICATION_INTERVAL_CAL_FIXED] ?: false
+    }
+
+    suspend fun setIntervalFixed(status: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTIFICATION_INTERVAL_CAL_FIXED] = status
+        }
+    }
+
+    val intervalStart = context.dataStore.data.map { preferences ->
+        preferences[NOTIFICATION_INTERVAL_START] ?: 1
+    }
+
+    suspend fun setIntervalStart(start: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTIFICATION_INTERVAL_START] = start
+        }
+    }
+
+    val notificationTime = context.dataStore.data
+        .map { preferences ->
+            preferences[NOTIFICATION_TIME] ?: "21:00"
+        }
+
+    suspend fun setNotificationTime(hour: Int, minute: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTIFICATION_TIME] = String.format("%02d:%02d", hour, minute)
+        }
+    }
 
 }
