@@ -67,11 +67,6 @@ fun SettingsScreen(
 
         val notificationPermissionState = rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
 
-        val requestPermissionLauncher = rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) {}
-
-
     val context = LocalContext.current
     val dataStore = PreferenceRepository(context)
     val scope = rememberCoroutineScope()
@@ -110,6 +105,7 @@ fun SettingsScreen(
 
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+
     Scaffold (
         topBar = {
             LargeTopAppBar(
@@ -136,7 +132,7 @@ fun SettingsScreen(
     ) { innerPadding ->
         LazyColumn (modifier = Modifier.fillMaxWidth().padding(top = innerPadding.calculateTopPadding())) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
-
+//            item { Button({ notificationViewModel.testN() }) { } }
             item {
                 SwitchRow(
                     title = stringResource(R.string.notification),

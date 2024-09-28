@@ -51,4 +51,8 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
         }
         return calendar.timeInMillis - System.currentTimeMillis()
     }
+
+//    fun testN() {
+//        notificationHelper.sendNotification()
+//    }
 }
