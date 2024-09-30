@@ -138,6 +138,8 @@ fun ActionScreen(
         }
         .build()
 
+    val context = LocalContext.current
+
     val openDialog = remember {
         mutableStateOf(false)
     }
@@ -215,6 +217,17 @@ fun ActionScreen(
                 },
                 onRollBackButtonClicked = {
                     viewModel.unMarkLastImage()
+                },
+                onShareButtonClicked = {
+                    val uri = images.value[pagerState.currentPage].contentUri
+                    val sendIntent: Intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        type = if (uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()))
+                            "image/*" else "video/*"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, null)
+                    context.startActivity(shareIntent)
                 },
                 showRestore = (lastMarked.value != null))
         }
@@ -436,6 +449,7 @@ fun ActionRow(
     onDelButtonLongClicked: () -> Unit,
     onDelButtonClicked: () -> Unit,
     onRollBackButtonClicked: () -> Unit,
+    onShareButtonClicked: () -> Unit,
     showRestore: Boolean
 ) {
         Box(
@@ -509,6 +523,19 @@ fun ActionRow(
                     )
             }
         }
+
+    Box(modifier = modifier.fillMaxWidth()
+        .padding(16.dp), contentAlignment = Alignment.CenterEnd) {
+        Button(onClick = onShareButtonClicked,
+            enabled = true,
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(48.dp),
+            colors = ButtonDefaults.outlinedButtonColors()) {
+            Icon(painter = painterResource(R.drawable.ic_share),
+                contentDescription = stringResource(R.string.share_media))
+        }
+    }
 }
 
 @Composable
