@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -138,6 +139,10 @@ fun ActionScreen(
         .build()
 
     val openDialog = remember {
+        mutableStateOf(false)
+    }
+
+    val openExcludeDialog = remember {
         mutableStateOf(false)
     }
 
@@ -300,27 +305,40 @@ fun ActionScreen(
                                             initialValue = dragOffset,
                                             targetValue = targetValue,
                                             animationSpec = tween(durationMillis = 400)
-                                        ) { value, velocity ->
+                                        ) { value, _ ->
                                             dragOffset = value
                                             swipeScale =
                                                 (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
                                         }
-                                        dragOffset = 0f
-                                        swipeScale = 1f
 
-                                        pagerState.animateScrollToPage(pagerState.currentPage)
 
-                                        if (images.value.isNotEmpty()) {
-                                            var index = pagerState.currentPage
+                                        if (images.value[pagerState.currentPage].isExcluded) {
+                                            openExcludeDialog.value = true
+                                        } else {
+
+                                            dragOffset = 0f
+                                            swipeScale = 1f
+
+//                                        pagerState.animateScrollToPage(pagerState.currentPage)
+
+                                            if (images.value.isNotEmpty()) {
+                                                var index = pagerState.currentPage
 //                                            if (pagerState.currentPage > 0) {
 //                                                index -= 1
 //                                            }
-                                            viewModel.markImage(index)
+                                                viewModel.markImage(index)
+                                            }
                                         }
+//                                        dragOffset = 0f
+//                                        swipeScale = 1f
                                     }
                                 } else {
                                     if (dragOffset == 100f) {
-                                        /* TODO MARK DO NOT DELETE */
+                                        if (images.value[pagerState.currentPage].isExcluded) {
+                                            viewModel.includeMedia(images.value[pagerState.currentPage])
+                                        } else {
+                                            viewModel.excludeMedia(pagerState.currentPage)
+                                        }
                                     }
                                     // Reset position and scale
                                     dragOffset = 0f
@@ -332,6 +350,22 @@ fun ActionScreen(
                     contentAlignment = Alignment.Center
                 ) {
 
+                    if (openExcludeDialog.value) {
+
+                        Dialog(
+                            onDismissRequest = { openExcludeDialog.value = false
+                                dragOffset = 0f
+                                swipeScale = 1f},
+                            onConfirmation = {
+                                dragOffset = 0f
+                                swipeScale = 1f
+                                viewModel.markImage(pagerState.currentPage)
+                                             openExcludeDialog.value = false
+                                             },
+                            dialogText = stringResource(R.string.delete_excluded)
+                        )
+                    }
+
                     val uri = images.value[page].contentUri
 
                     val context = LocalContext.current
@@ -339,13 +373,32 @@ fun ActionScreen(
                         data = uri
                     }
 
-                    MediaPlayer(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                        , uri = uri, imageLoader = imageLoader, onVideoClick = {
-                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
+                    Box(modifier = Modifier.wrapContentSize(), contentAlignment = Alignment.TopStart){
+                        MediaPlayer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                            , uri = uri, imageLoader = imageLoader, onVideoClick = {
+                                context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
                             }
-                    )
+                        )
+                        if (images.value[page].isExcluded){
+                            IconButton(onClick = {},
+                                colors = IconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurface),
+                                modifier = Modifier.padding(8.dp)) {
+                                Icon(
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    painter = painterResource(R.drawable.ic_star),
+                                    contentDescription = stringResource(R.string.is_excluded)
+                                )
+                            }
+                        }
+                    }
+
+
                 }
 
             }

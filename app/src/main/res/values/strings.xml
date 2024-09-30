@@ -43,4 +43,6 @@
     <string name="restart_permission_description">Review the permission settings.</string>
     <string name="notfication_channel_monthly">Clear</string>
     <string name="time_to_clear">Time to clear media</string>
+    <string name="is_excluded">This media will be excluded when holding delete button to delete</string>
+    <string name="delete_excluded">This media has been marked to exclude from deletion, are you sure to delete it?</string>
 </resources>

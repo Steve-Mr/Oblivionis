@@ -19,13 +19,19 @@ interface ImageDao {
     @Query("DELETE FROM images")
     suspend fun removeAll()
 
-    @Query("SELECT * FROM images")
+    @Query("SELECT * FROM images WHERE is_marked = true")
     fun getAllMarks(): Flow<List<MediaStoreImage>>?
+
+    @Query("SELECT * FROM images WHERE is_excluded = true")
+    fun getAllExcludes(): Flow<List<MediaStoreImage>>?
 
     @Query("SELECT * FROM images ORDER BY date_added DESC LIMIT 1")
     suspend fun getLastMarked(): MediaStoreImage
 
     @Query("DELETE FROM images WHERE id = :id")
     suspend fun removeId(id: Long)
+
+    @Query("UPDATE images SET is_marked = :isMarked WHERE id = :id")
+    suspend fun updateIsMarked(id: Long, isMarked: Boolean)
 
 }
