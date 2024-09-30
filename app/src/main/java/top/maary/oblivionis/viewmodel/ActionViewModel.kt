@@ -49,10 +49,13 @@ class ActionViewModel(
     val unmarkedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
         images.filter { !it.isMarked }
     }
+    val excludedMedia : Flow<List<MediaStoreImage>> = _images.map { images ->
+        images.filter { it.isExcluded }
+    }
 
     var albumPath: String? = null
 
-    private val _lastMarked = MutableStateFlow<MediaStoreImage?>(null)
+    private val _lastMarked = MutableStateFlow<List<MediaStoreImage?>>(emptyList())
     val lastMarked = _lastMarked.asStateFlow()
 
     private var contentObserver: ContentObserver? = null
@@ -79,6 +82,10 @@ class ActionViewModel(
             val databaseMarks = imageRepository.allMarks?.firstOrNull()
             if (!databaseMarks.isNullOrEmpty()) {
                 restoreMarkList(databaseMarks)
+            }
+            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
+            if (!databaseExclusions.isNullOrEmpty()) {
+                restoreExcluded(databaseExclusions)
             }
 
             if (contentObserver == null) {
@@ -199,8 +206,8 @@ class ActionViewModel(
 
         // 获取要标记的图片
         val target = unmarkedImageList[index]
-        _lastMarked.value = target.copy(isMarked = true)
-        databaseMark(target)
+        _lastMarked.value += target.copy(isMarked = true)
+        databaseMark(target.copy(isMarked = true))
 
         // 复制原始图片列表并找到要标记的图片的索引
         val updatedList = _images.value.toMutableList()
@@ -214,20 +221,39 @@ class ActionViewModel(
             // 更新 _images 列表，Flow 会自动更新
             _images.value = updatedList
         }
+    }
 
-        val markedImageList = _images.value.filter {
-            it.isMarked
+    fun excludeMedia(index: Int) {
+        val unmarkedImageList = _images.value.filter {
+            !it.isMarked
         }
 
-        Log.v("YDNM", "MARKED ${markedImageList.size}")
+        // 获取要标记的图片
+        val target = unmarkedImageList[index]
+        databaseMark(target.copy(isExcluded = true))
 
+        // 复制原始图片列表并找到要标记的图片的索引
+        val updatedList = _images.value.toMutableList()
+        val newIndex = updatedList.indexOf(target)
+
+        // 确保找到图片并且不为空
+        if (newIndex != -1) {
+            // 标记图片
+            updatedList[newIndex] = target.copy(isExcluded = true)
+
+            // 更新 _images 列表，Flow 会自动更新
+            _images.value = updatedList
+        }
     }
 
     fun unMarkLastImage(): Long? {
+        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE")
         // 检查 lastMarkedImage 是否为空
-        _lastMarked.value?.let { img ->
             // 创建一个更新后的 _images 列表
-            val updatedList = _images.value.toMutableList()
+            val img = _lastMarked.value.lastOrNull() ?: return null
+        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE2")
+
+        val updatedList = _images.value.toMutableList()
 
             // 找到 lastMarkedImage 的索引
             val index = updatedList.indexOf(img)
@@ -242,22 +268,28 @@ class ActionViewModel(
                 _images.value = updatedList
 
                 // 清空 lastMarkedImage
-                _lastMarked.value = null
+                _lastMarked.value = _lastMarked.value.dropLast(1)
 
                 // 返回图片的 id
                 return img.id
             }
-        }
+
         return null
+
     }
 
     fun unMarkImage(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
         updatedList[updatedList.indexOf(target.copy(isMarked = true))] = target.copy(isMarked = false)
-        databaseUnmark(target)
-        if (target == _lastMarked.value) {
-            _lastMarked.value = null
-        }
+        databaseUnmark(target.copy(isMarked = true))
+        _lastMarked.value = _lastMarked.value.filterNot { it == target }
+        _images.value = updatedList
+    }
+
+    fun includeMedia(target: MediaStoreImage) {
+        val updatedList = _images.value.toMutableList()
+        updatedList[updatedList.indexOf(target.copy(isExcluded = true))] = target.copy(isExcluded = false)
+        databaseUnmark(target.copy(isExcluded = true))
         _images.value = updatedList
     }
 
@@ -265,18 +297,59 @@ class ActionViewModel(
         _images.update { currentList ->
             currentList.filter { !it.isMarked }
         }
-        _lastMarked.value = null
+        _lastMarked.value = emptyList()
         databaseRemoveAll()
     }
 
     fun restoreMarkList(listToMark: List<MediaStoreImage>) {
         val updatedList = _images.value.toMutableList()
 
-        updatedList.forEach { item ->
-            updatedList[updatedList.indexOf(item)] = item.copy(isMarked = item in listToMark)
+        Log.v("OBLIVIONIS", "RESTORE ${listToMark.size}")
+
+
+        listToMark.forEach { item ->
+            val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
+            if (index == -1) return@forEach
+            updatedList[index] = item.copy(isMarked = true)
             Log.v("YDNM", "ITEM IS ${item in listToMark}")
         }
         _images.value = updatedList
+
+    }
+
+    fun restoreExcluded(list: List<MediaStoreImage>) {
+        val updatedList = _images.value.toMutableList()
+
+        list.forEach { item ->
+            val index = updatedList.indexOf(item.copy(isExcluded = false))
+            if (index == -1) return@forEach
+            updatedList[index] = item.copy(isExcluded = true)
+        }
+        _images.value = updatedList
+    }
+
+    fun restoreState() {
+        viewModelScope.launch {
+            val marks = imageRepository.allMarks?.firstOrNull()
+            val exclusions = imageRepository.allExcludes?.firstOrNull()
+            val updatedList = _images.value.toMutableList()
+
+            if (!marks.isNullOrEmpty()) {
+                marks.forEach { item ->
+                    val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
+                    if (index == -1) return@forEach
+                    updatedList[index] = item.copy(isMarked = true)
+                }
+            }
+            if (!exclusions.isNullOrEmpty()) {
+                exclusions.forEach { item ->
+                    val index = updatedList.indexOf(item.copy(isExcluded = false))
+                    if (index == -1) return@forEach
+                    updatedList[index] = item.copy(isExcluded = true)
+                }
+            }
+            _images.value = updatedList
+        }
 
     }
 
@@ -408,15 +481,16 @@ class ActionViewModel(
     }
 
     fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
-        imageRepository.mark(image.copy(isMarked = false))
+        imageRepository.mark(image)
     }
 
     fun databaseUnmark(image: MediaStoreImage) = viewModelScope.launch {
-        imageRepository.unmark(image.copy(isMarked = false))
+        imageRepository.unmark(image)
     }
 
     fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
         images.forEach {
+            if (it.isExcluded) return@forEach
             imageRepository.mark(it.copy(isMarked = false))
         }
     }
@@ -430,7 +504,10 @@ class ActionViewModel(
     fun markAllImages() {
         databaseMarkAll(images = _images.value)
         _images.update { currentList ->
-            currentList.map { it.copy(isMarked = true) }
+            currentList.map {
+                if (!it.isExcluded) it.copy(isMarked = true)
+                else it
+            }
         }
     }
 
@@ -439,7 +516,7 @@ class ActionViewModel(
         _images.update { currentList ->
             currentList.map { it.copy(isMarked = false) }
         }
-        _lastMarked.value = null
+        _lastMarked.value = emptyList()
     }
 
     private fun databaseUnmarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {

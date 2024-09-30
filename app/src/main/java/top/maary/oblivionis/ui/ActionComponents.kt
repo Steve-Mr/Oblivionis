@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,12 +31,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgeDefaults
@@ -72,6 +76,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -137,7 +142,13 @@ fun ActionScreen(
         }
         .build()
 
+    val context = LocalContext.current
+
     val openDialog = remember {
+        mutableStateOf(false)
+    }
+
+    val openExcludeDialog = remember {
         mutableStateOf(false)
     }
 
@@ -147,7 +158,6 @@ fun ActionScreen(
 
         topBar = {
             CenterAlignedTopAppBar(
-//                modifier = Modifier.shadow(10.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f),
                     titleContentColor = MaterialTheme.colorScheme.primary,
@@ -212,7 +222,18 @@ fun ActionScreen(
                 onRollBackButtonClicked = {
                     viewModel.unMarkLastImage()
                 },
-                showRestore = (lastMarked.value != null))
+                onShareButtonClicked = {
+                    val uri = images.value[pagerState.currentPage].contentUri
+                    val sendIntent: Intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        type = if (uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()))
+                            "image/*" else "video/*"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, null)
+                    context.startActivity(shareIntent)
+                },
+                showRestore = (lastMarked.value.isNotEmpty()))
         }
 
     ) { innerPadding ->
@@ -301,25 +322,41 @@ fun ActionScreen(
                                             initialValue = dragOffset,
                                             targetValue = targetValue,
                                             animationSpec = tween(durationMillis = 400)
-                                        ) { value, velocity ->
+                                        ) { value, _ ->
                                             dragOffset = value
                                             swipeScale =
                                                 (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
                                         }
-                                        dragOffset = 0f
-                                        swipeScale = 1f
 
-                                        pagerState.animateScrollToPage(pagerState.currentPage)
 
-                                        if (images.value.isNotEmpty()) {
-                                            var index = pagerState.currentPage
+                                        if (images.value[pagerState.currentPage].isExcluded) {
+                                            openExcludeDialog.value = true
+                                        } else {
+
+                                            dragOffset = 0f
+                                            swipeScale = 1f
+
+//                                        pagerState.animateScrollToPage(pagerState.currentPage)
+
+                                            if (images.value.isNotEmpty()) {
+                                                var index = pagerState.currentPage
 //                                            if (pagerState.currentPage > 0) {
 //                                                index -= 1
 //                                            }
-                                            viewModel.markImage(index)
+                                                viewModel.markImage(index)
+                                            }
                                         }
+//                                        dragOffset = 0f
+//                                        swipeScale = 1f
                                     }
                                 } else {
+                                    if (dragOffset == 100f) {
+                                        if (images.value[pagerState.currentPage].isExcluded) {
+                                            viewModel.includeMedia(images.value[pagerState.currentPage])
+                                        } else {
+                                            viewModel.excludeMedia(pagerState.currentPage)
+                                        }
+                                    }
                                     // Reset position and scale
                                     dragOffset = 0f
                                     swipeScale = 1f
@@ -330,6 +367,22 @@ fun ActionScreen(
                     contentAlignment = Alignment.Center
                 ) {
 
+                    if (openExcludeDialog.value) {
+
+                        Dialog(
+                            onDismissRequest = { openExcludeDialog.value = false
+                                dragOffset = 0f
+                                swipeScale = 1f},
+                            onConfirmation = {
+                                dragOffset = 0f
+                                swipeScale = 1f
+                                viewModel.markImage(pagerState.currentPage)
+                                             openExcludeDialog.value = false
+                                             },
+                            dialogText = stringResource(R.string.delete_excluded)
+                        )
+                    }
+
                     val uri = images.value[page].contentUri
 
                     val context = LocalContext.current
@@ -337,42 +390,132 @@ fun ActionScreen(
                         data = uri
                     }
 
-                    MediaPlayer(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                        , uri = uri, imageLoader = imageLoader, onVideoClick = {
-                        context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
+                    Box(modifier = Modifier.wrapContentSize(), contentAlignment = Alignment.TopStart){
+                        MediaPlayer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                            , uri = uri, imageLoader = imageLoader, onVideoClick = {
+                                context.startActivity(Intent.createChooser(intent, context.getString(R.string.choose_app)))
                             }
-                    )
+                        )
+                        if (images.value[page].isExcluded){
+                            IconButton(onClick = {},
+                                colors = IconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurface),
+                                modifier = Modifier.padding(8.dp)) {
+                                Icon(
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    painter = painterResource(R.drawable.ic_star),
+                                    contentDescription = stringResource(R.string.is_excluded)
+                                )
+                            }
+                        }
+                    }
+
+
                 }
 
             }
     }
 }
 
+//@Composable
+//fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
+//                onImageClick: () -> Unit = {}, onVideoClick: () -> Unit, onLongPress: () -> Unit = {}) {
+//    Box(modifier = Modifier.wrapContentSize()) {
+//        when {
+//            uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+//                // 处理图片变化
+//                AsyncImage(
+//                    model = uri,
+//                    contentDescription = "",
+//                    modifier = modifier
+//                        .clickable { onImageClick() }
+//                        .clip(RoundedCornerShape(8.dp))
+//                )
+//            }
+//
+//            uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+//                // 处理视频变化
+////            VideoView(modifier = modifier, uri = uri)
+//                VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader, onClick = {
+//                    onVideoClick()
+//                })
+//            }
+//        }
+//    }
+//}
+
 @Composable
-fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
-                onImageClick: () -> Unit = {}, onVideoClick: () -> Unit) {
-    when {
-        uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
-            // 处理图片变化
-            AsyncImage(
-                model = uri,
-                contentDescription = "",
-                modifier = modifier
-                    .clickable { onImageClick() }
-                    .clip(RoundedCornerShape(8.dp))
+fun MediaPlayer(
+    modifier: Modifier,
+    uri: Uri,
+    imageLoader: ImageLoader,
+    isMultiSelectionState: Boolean = false,
+    isSelected: Boolean = false, // 用于表示当前项是否被选中
+    onImageClick: () -> Unit = {},
+    onVideoClick: () -> Unit = {},
+    onLongPress: () -> Unit = {} // 长按事件
+) {
+    Box(
+        modifier = Modifier
+            .wrapContentSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        Log.v("OBLIVIONIS", "LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG PRESS")
+                        onLongPress() // 处理长按事件
+                    },
+                    onTap = {
+                        if (uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())) {
+                            onImageClick()
+                        } else if (uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString())) {
+                            onVideoClick()
+                        }
+                    }
+                )
+            }
+    ) {
+        when {
+            // 处理图片显示
+            uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "",
+                    modifier = modifier
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+
+            // 处理视频显示
+            uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+                VideoViewAlt(
+                    modifier = modifier,
+                    uri = uri,
+                    imageLoader = imageLoader
+                )
+            }
+        }
+
+        if (isMultiSelectionState) {
+            // 显示选择框的图标
+            Icon(
+                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (isSelected) "Selected" else "Not Selected",
+                modifier = Modifier
+                    .align(Alignment.TopEnd) // 选择框显示在右上角
+                    .size(48.dp)
+                    .padding(8.dp),
+                tint = if (isSelected) Color.Blue else Color.Gray // 设置选中的颜色
             )
         }
-        uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
-            // 处理视频变化
-//            VideoView(modifier = modifier, uri = uri)
-            VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader,onClick = {
-                onVideoClick()
-            })
-        }
+
     }
 }
+
 
 @Composable
 fun ActionRow(
@@ -381,6 +524,7 @@ fun ActionRow(
     onDelButtonLongClicked: () -> Unit,
     onDelButtonClicked: () -> Unit,
     onRollBackButtonClicked: () -> Unit,
+    onShareButtonClicked: () -> Unit,
     showRestore: Boolean
 ) {
         Box(
@@ -454,6 +598,19 @@ fun ActionRow(
                     )
             }
         }
+
+    Box(modifier = modifier.fillMaxWidth()
+        .padding(16.dp), contentAlignment = Alignment.CenterEnd) {
+        Button(onClick = onShareButtonClicked,
+            enabled = true,
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(48.dp),
+            colors = ButtonDefaults.outlinedButtonColors()) {
+            Icon(painter = painterResource(R.drawable.ic_share),
+                contentDescription = stringResource(R.string.share_media))
+        }
+    }
 }
 
 @Composable
