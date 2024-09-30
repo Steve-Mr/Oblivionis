@@ -229,7 +229,7 @@ fun ActionScreen(
                     val shareIntent = Intent.createChooser(sendIntent, null)
                     context.startActivity(shareIntent)
                 },
-                showRestore = (lastMarked.value != null))
+                showRestore = (lastMarked.value.isNotEmpty()))
         }
 
     ) { innerPadding ->

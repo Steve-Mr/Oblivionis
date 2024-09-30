@@ -55,7 +55,7 @@ class ActionViewModel(
 
     var albumPath: String? = null
 
-    private val _lastMarked = MutableStateFlow<MediaStoreImage?>(null)
+    private val _lastMarked = MutableStateFlow<List<MediaStoreImage?>>(emptyList())
     val lastMarked = _lastMarked.asStateFlow()
 
     private var contentObserver: ContentObserver? = null
@@ -206,7 +206,7 @@ class ActionViewModel(
 
         // 获取要标记的图片
         val target = unmarkedImageList[index]
-        _lastMarked.value = target.copy(isMarked = true)
+        _lastMarked.value += target.copy(isMarked = true)
         databaseMark(target.copy(isMarked = true))
 
         // 复制原始图片列表并找到要标记的图片的索引
@@ -247,10 +247,13 @@ class ActionViewModel(
     }
 
     fun unMarkLastImage(): Long? {
+        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE")
         // 检查 lastMarkedImage 是否为空
-        _lastMarked.value?.let { img ->
             // 创建一个更新后的 _images 列表
-            val updatedList = _images.value.toMutableList()
+            val img = _lastMarked.value.lastOrNull() ?: return null
+        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE2")
+
+        val updatedList = _images.value.toMutableList()
 
             // 找到 lastMarkedImage 的索引
             val index = updatedList.indexOf(img)
@@ -265,22 +268,21 @@ class ActionViewModel(
                 _images.value = updatedList
 
                 // 清空 lastMarkedImage
-                _lastMarked.value = null
+                _lastMarked.value = _lastMarked.value.dropLast(1)
 
                 // 返回图片的 id
                 return img.id
             }
-        }
+
         return null
+
     }
 
     fun unMarkImage(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
         updatedList[updatedList.indexOf(target.copy(isMarked = true))] = target.copy(isMarked = false)
         databaseUnmark(target.copy(isMarked = true))
-        if (target == _lastMarked.value) {
-            _lastMarked.value = null
-        }
+        _lastMarked.value = _lastMarked.value.filterNot { it == target }
         _images.value = updatedList
     }
 
@@ -288,9 +290,6 @@ class ActionViewModel(
         val updatedList = _images.value.toMutableList()
         updatedList[updatedList.indexOf(target.copy(isExcluded = true))] = target.copy(isExcluded = false)
         databaseUnmark(target.copy(isExcluded = true))
-        if (target == _lastMarked.value) {
-            _lastMarked.value = null
-        }
         _images.value = updatedList
     }
 
@@ -298,7 +297,7 @@ class ActionViewModel(
         _images.update { currentList ->
             currentList.filter { !it.isMarked }
         }
-        _lastMarked.value = null
+        _lastMarked.value = emptyList()
         databaseRemoveAll()
     }
 
@@ -517,7 +516,7 @@ class ActionViewModel(
         _images.update { currentList ->
             currentList.map { it.copy(isMarked = false) }
         }
-        _lastMarked.value = null
+        _lastMarked.value = emptyList()
     }
 
     private fun databaseUnmarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
