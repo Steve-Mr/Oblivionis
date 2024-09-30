@@ -36,7 +36,7 @@
     <string name="d60">60 Days</string>
     <string name="notification_interval_fixed">Fixed notification time</string>
     <string name="notification_interval_fixed_description">Set the reminder time to either a fixed period or based on your last cleanup time.</string>
-    <string name="select_start_date_description">Choose the date for each notification to occur every month.</string>
+    <string name="select_start_date_description">Choose the date for the first notification.</string>
     <string name="select_start_date">Notification date</string>
     <string name="notfication_time">Notification time</string>
     <string name="restart_permission">Reopen welcome screen</string>
@@ -48,4 +48,5 @@
     <string name="share_media">Share this media</string>
     <string name="select_all">Select All</string>
     <string name="restore_selected_confirmation">Selected media will be restored.</string>
+    <string name="d1">1 Day</string>
 </resources>

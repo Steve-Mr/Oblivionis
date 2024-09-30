@@ -78,6 +78,7 @@ fun SettingsScreen(
     val notificationTime = dataStore.notificationTime.collectAsState(initial = "21:00")
 
     val intervalsHashMap : LinkedHashMap<String, Int> = linkedMapOf(
+        stringResource(R.string.d1) to 1,
         stringResource(R.string.d15) to 15,
         stringResource(R.string.d30) to 30,
         stringResource(R.string.d45) to 45,
@@ -217,11 +218,14 @@ fun SettingsScreen(
 
                             })
                         if (notificationIntervalFixed.value) {
+                            Log.v("OBLIVIONIS", "${notificationIntervalStart.value} DROPDOWN")
+                            val position = if (intervalStartList.indexOf(notificationIntervalStart.value.toString()) == -1) 0
+                            else intervalStartList.indexOf(notificationIntervalStart.value.toString())
                             DropdownRow(
                                 title = stringResource(R.string.select_start_date),
                                 description = stringResource(R.string.select_start_date_description),
                                 options = intervalStartList,
-                                position = intervalStartList.indexOf(notificationIntervalStart.value.toString()),
+                                position = position,
                                 onItemClicked = {
                                     scope.launch {
                                         dataStore.setIntervalStart(intervalStartList[it].toInt())
