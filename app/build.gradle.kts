@@ -25,12 +25,15 @@ android {
         applicationId = "top.maary.oblivionis"
         minSdk = 31
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0-alpha"
+        versionCode = 2
+        versionName = "1.0-alpha-0930"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+        ksp {
+            arg("room.schemaLocation", "$projectDir/schemas")
         }
     }
 
@@ -51,6 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("config")
+        }
+        debug {
             signingConfig = signingConfigs.getByName("config")
         }
     }
@@ -106,6 +112,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -144,5 +151,8 @@ dependencies {
 
     implementation(libs.androidx.foundation)
 
+    implementation(libs.androidx.datastore.preferences)
+
+    implementation("androidx.compose.material:material-icons-extended:1.7.2")
 
 }

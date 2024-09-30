@@ -45,7 +45,7 @@ def sendAPKs(path):
     apks = os.listdir("apks")
     apks.sort()
     apk = os.path.join("apks", apks[0])
-    sendDocument(user_id="@maaryIsTyping", path = apk, message="#app #apk #wallpaperTunnel https://github.com/Steve-Mr/WallpaperTunnel")
+    sendDocument(user_id="@maaryIsTyping", path = apk, message="#app #apk #Oblivionis https://github.com/Steve-Mr/Oblivionis")
 
 if __name__ == '__main__':
     sendAPKs("./apks")
