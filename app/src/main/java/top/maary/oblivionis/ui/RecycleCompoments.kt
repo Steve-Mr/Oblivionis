@@ -1,12 +1,14 @@
 package top.maary.oblivionis.ui
 
 import android.app.Activity
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.animation.splineBasedDecay
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.layout.Spacer
@@ -32,12 +34,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -101,6 +106,7 @@ fun RecycleScreen(
         }
     }
 
+    val selectedItems = remember { mutableStateOf(mutableSetOf<Int>()) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -153,9 +159,26 @@ fun RecycleScreen(
                             dialogText = stringResource(id = R.string.deleteAllConfirmation)
                         )
                     }
-                    FilledTonalButton(onClick = { openDialog.value = true },
-                        modifier = Modifier.padding(end = 8.dp)) {
-                        Text(stringResource(id = R.string.deleteAll))
+                    if (selectedItems.value.isNotEmpty()) {
+                        FilledTonalButton(
+                            onClick = {
+                                if (selectedItems.value.size != images.value.size) {
+                                    selectedItems.value = images.value.indices.toMutableSet()
+                                }else{
+                                    selectedItems.value = mutableSetOf()
+                                } },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(stringResource(id = R.string.select_all))
+                        }
+                    } else {
+                        FilledTonalButton(
+                            enabled = images.value.isNotEmpty(),
+                            onClick = { openDialog.value = true },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(stringResource(id = R.string.deleteAll))
+                        }
                     }
                 },
                 title = {}
@@ -165,19 +188,28 @@ fun RecycleScreen(
             val openDialog = remember {
                 mutableStateOf(false)
             }
-            FloatingActionButton(onClick = { openDialog.value = true }) {
-                if (openDialog.value) {
-                    Dialog(
-                        onDismissRequest = { openDialog.value = false },
-                        onConfirmation = {
-                            actionViewModel.unMarkAll()
-                            openDialog.value = false },
-                        dialogText = stringResource(id = R.string.restoreAllConfirmation)
+            if (selectedItems.value.isNotEmpty()) {
+                FloatingActionButton(onClick = { openDialog.value = true }) {
+                    if (openDialog.value) {
+                        Dialog(
+                            onDismissRequest = { openDialog.value = false },
+                            onConfirmation = {
+                                selectedItems.value.forEach { index ->
+                                    actionViewModel.unMarkImage(images.value[index])
+                                }
+                                selectedItems.value = mutableSetOf()
+                                openDialog.value = false
+                            },
+                            dialogText = stringResource(id = R.string.restore_selected_confirmation)
+                        )
+                    }
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_restore_all),
+                        contentDescription = stringResource(
+                            id = R.string.restoreAllConfirmation
+                        )
                     )
                 }
-                Icon(painter = painterResource(id = R.drawable.ic_restore_all), contentDescription = stringResource(
-                    id = R.string.restoreAllConfirmation
-                ))
             }
         }
     ) { innerPadding ->
@@ -201,6 +233,7 @@ fun RecycleScreen(
                         )
                     }
                     items(images.value.size) { index ->
+                        val isSelected by remember { derivedStateOf { selectedItems.value.contains(index) }}
 
                         if (openDialog.value) {
                             Dialog(
@@ -216,16 +249,43 @@ fun RecycleScreen(
 
                         MediaPlayer(
                             modifier = Modifier
-                                .padding(2.dp),
+                                .padding(2.dp)
+                                .background(if (isSelected) Color.Gray else Color.Transparent),
                             uri = images.value[index].contentUri,
+                            isMultiSelectionState = selectedItems.value.isNotEmpty(),
+                            isSelected = selectedItems.value.contains(index),
                             imageLoader = imageLoader,
                             onImageClick = {
+                                if (selectedItems.value.isNotEmpty()) {
+                                    val newSet = selectedItems.value.toMutableSet() // 创建一个新集合
+                                    if (!newSet.add(index)) {
+                                        newSet.remove(index) // 如果元素已存在，则移除
+                                    }
+                                    selectedItems.value = newSet // 更新 `selectedItems.value`，触发重组
+                                    return@MediaPlayer
+                                }
                                 clickedIndex.intValue = index
                                 openDialog.value = true
                             },
                             onVideoClick = {
+                                if (selectedItems.value.isNotEmpty()) {
+                                    val newSet = selectedItems.value.toMutableSet() // 创建一个新集合
+                                    if (!newSet.add(index)) {
+                                        newSet.remove(index) // 如果元素已存在，则移除
+                                    }
+                                    selectedItems.value = newSet // 更新 `selectedItems.value`，触发重组
+                                    return@MediaPlayer
+                                }
                                 clickedIndex.intValue = index
                                 openDialog.value = true
+                            },
+                            onLongPress = {
+                                    val newSet = selectedItems.value.toMutableSet() // 创建一个新集合
+                                    if (!newSet.add(index)) {
+                                        newSet.remove(index) // 如果元素已存在，则移除
+                                    }
+                                    selectedItems.value = newSet // 更新 `selectedItems.value`，触发重组
+
                             })
 
                     }

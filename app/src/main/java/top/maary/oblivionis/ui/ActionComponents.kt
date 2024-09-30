@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -37,6 +38,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgeDefaults
@@ -73,6 +76,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -418,29 +422,100 @@ fun ActionScreen(
     }
 }
 
+//@Composable
+//fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
+//                onImageClick: () -> Unit = {}, onVideoClick: () -> Unit, onLongPress: () -> Unit = {}) {
+//    Box(modifier = Modifier.wrapContentSize()) {
+//        when {
+//            uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+//                // 处理图片变化
+//                AsyncImage(
+//                    model = uri,
+//                    contentDescription = "",
+//                    modifier = modifier
+//                        .clickable { onImageClick() }
+//                        .clip(RoundedCornerShape(8.dp))
+//                )
+//            }
+//
+//            uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+//                // 处理视频变化
+////            VideoView(modifier = modifier, uri = uri)
+//                VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader, onClick = {
+//                    onVideoClick()
+//                })
+//            }
+//        }
+//    }
+//}
+
 @Composable
-fun MediaPlayer(modifier: Modifier, uri: Uri, imageLoader: ImageLoader,
-                onImageClick: () -> Unit = {}, onVideoClick: () -> Unit) {
-    when {
-        uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
-            // 处理图片变化
-            AsyncImage(
-                model = uri,
-                contentDescription = "",
-                modifier = modifier
-                    .clickable { onImageClick() }
-                    .clip(RoundedCornerShape(8.dp))
+fun MediaPlayer(
+    modifier: Modifier,
+    uri: Uri,
+    imageLoader: ImageLoader,
+    isMultiSelectionState: Boolean = false,
+    isSelected: Boolean = false, // 用于表示当前项是否被选中
+    onImageClick: () -> Unit = {},
+    onVideoClick: () -> Unit = {},
+    onLongPress: () -> Unit = {} // 长按事件
+) {
+    Box(
+        modifier = Modifier
+            .wrapContentSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        Log.v("OBLIVIONIS", "LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG PRESS")
+                        onLongPress() // 处理长按事件
+                    },
+                    onTap = {
+                        if (uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())) {
+                            onImageClick()
+                        } else if (uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString())) {
+                            onVideoClick()
+                        }
+                    }
+                )
+            }
+    ) {
+        when {
+            // 处理图片显示
+            uri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "",
+                    modifier = modifier
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
+
+            // 处理视频显示
+            uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
+                VideoViewAlt(
+                    modifier = modifier,
+                    uri = uri,
+                    imageLoader = imageLoader
+                )
+            }
+        }
+
+        if (isMultiSelectionState) {
+            // 显示选择框的图标
+            Icon(
+                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (isSelected) "Selected" else "Not Selected",
+                modifier = Modifier
+                    .align(Alignment.TopEnd) // 选择框显示在右上角
+                    .size(48.dp)
+                    .padding(8.dp),
+                tint = if (isSelected) Color.Blue else Color.Gray // 设置选中的颜色
             )
         }
-        uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
-            // 处理视频变化
-//            VideoView(modifier = modifier, uri = uri)
-            VideoViewAlt(modifier = modifier, uri = uri, imageLoader = imageLoader,onClick = {
-                onVideoClick()
-            })
-        }
+
     }
 }
+
 
 @Composable
 fun ActionRow(

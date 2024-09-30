@@ -46,4 +46,6 @@
     <string name="is_excluded">This media will be excluded when holding delete button to delete</string>
     <string name="delete_excluded">This media has been marked to exclude from deletion, are you sure to delete it?</string>
     <string name="share_media">Share this media</string>
+    <string name="select_all">Select All</string>
+    <string name="restore_selected_confirmation">Selected media will be restored.</string>
 </resources>
