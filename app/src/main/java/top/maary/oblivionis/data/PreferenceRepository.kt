@@ -1,7 +1,6 @@
 package top.maary.oblivionis.data
 
 import android.content.Context
-import androidx.compose.ui.res.stringResource
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -20,7 +19,7 @@ class PreferenceRepository(private val context: Context) {
         val NOTIFICATION_INTERVAL = intPreferencesKey("NOTIFICATION_INTERVAL")
         val NOTIFICATION_INTERVAL_CAL_FIXED = booleanPreferencesKey("NOTIFICATION_INTERVAL_CAL_FIXED")
         val NOTIFICATION_INTERVAL_START = intPreferencesKey("NOTIFICATION_INTERVAL_START")
-        val NOTIFICATION_TIME = stringPreferencesKey("NOTFICATION_TIME")
+        val NOTIFICATION_TIME = stringPreferencesKey("NOTIFICATION_TIME")
     }
 
     val permissionGranted = context.dataStore.data.map { preferences ->

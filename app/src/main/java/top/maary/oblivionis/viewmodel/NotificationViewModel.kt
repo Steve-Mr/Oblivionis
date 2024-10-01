@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import top.maary.oblivionis.NotificationHelper
 import top.maary.oblivionis.NotificationWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -16,8 +15,6 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
     companion object {
         const val UNIQUE_WORK_NAME = "periodicNotification"
     }
-    val notificationHelper = NotificationHelper(application.applicationContext)
-
 
     fun scheduleNotification(
         date: Int,
@@ -51,8 +48,4 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
         }
         return calendar.timeInMillis - System.currentTimeMillis()
     }
-
-//    fun testN() {
-//        notificationHelper.sendNotification()
-//    }
 }
