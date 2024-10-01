@@ -32,7 +32,7 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
             .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
             .build()
 
-        workManager.enqueueUniquePeriodicWork(UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, workRequest)
+        workManager.enqueueUniquePeriodicWork(UNIQUE_WORK_NAME, ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE, workRequest)
     }
 
     fun cancelNotification() {
