@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -181,11 +183,13 @@ fun SettingsScreen(
                                 }
                             },
                         )
+
                         SwitchRow(
                             title = stringResource(R.string.notification_interval_fixed),
                             description = stringResource(R.string.notification_interval_fixed_description),
                             state = notificationIntervalFixed.value
                         ) { scope.launch { dataStore.setIntervalFixed(it) } }
+
                         TimePickerItem(title = stringResource(R.string.notfication_time),
                             time = notificationTimeInDate,
                             onConfirm = {
@@ -208,7 +212,6 @@ fun SettingsScreen(
 
                             })
                         if (notificationIntervalFixed.value) {
-                            Log.v("OBLIVIONIS", "${notificationIntervalStart.value} DROPDOWN")
                             val position =
                                 if (intervalStartList.indexOf(notificationIntervalStart.value.toString()) == -1) 0
                                 else intervalStartList.indexOf(notificationIntervalStart.value.toString())
@@ -261,6 +264,8 @@ fun SettingsScreen(
                     ).versionName
                 )
             }
+
+            // item { Button({ notificationViewModel.testN() }) { } }
 
             item { Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding())) }
 

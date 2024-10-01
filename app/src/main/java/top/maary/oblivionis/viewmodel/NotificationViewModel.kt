@@ -1,10 +1,12 @@
 package top.maary.oblivionis.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import top.maary.oblivionis.NotificationHelper
 import top.maary.oblivionis.NotificationWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -15,6 +17,8 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
     companion object {
         const val UNIQUE_WORK_NAME = "periodicNotification"
     }
+    private val notificationHelper = NotificationHelper(application.applicationContext)
+
 
     fun scheduleNotification(
         date: Int,
@@ -22,6 +26,7 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
         minute: Int,
         interval: Long) {
         val initialDelay = calculateInitialDelay(date, hour, minute)
+        Log.v("OBLIVIONIS", "INITIALDELAY $initialDelay")
 
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(interval, TimeUnit.DAYS)
             .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
@@ -47,5 +52,9 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
             }
         }
         return calendar.timeInMillis - System.currentTimeMillis()
+    }
+
+    fun testN() {
+        notificationHelper.sendNotification()
     }
 }
