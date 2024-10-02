@@ -246,7 +246,7 @@ fun SettingsScreen(
             }
 
             item {
-                TextContent(modifier = Modifier
+                TextContent(modifier = Modifier.fillMaxWidth()
                     .clickable {
                         onReWelcomeClick()
                     }

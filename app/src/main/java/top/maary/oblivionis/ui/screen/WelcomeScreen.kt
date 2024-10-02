@@ -1,16 +1,20 @@
 package top.maary.oblivionis.ui.screen
 
+import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -38,7 +42,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import top.maary.oblivionis.R
 import top.maary.oblivionis.ui.PermissionBlock
 
@@ -54,15 +60,18 @@ fun WelcomeScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             rememberMultiplePermissionsState(
                 permissions = listOf(
-                    android.Manifest.permission.READ_MEDIA_IMAGES,
-                    android.Manifest.permission.READ_MEDIA_VIDEO
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VIDEO
                 )
             )
         } else {
-            rememberMultiplePermissionsState(permissions = listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE))
+            rememberMultiplePermissionsState(permissions = listOf(Manifest.permission.READ_EXTERNAL_STORAGE))
         }
 
     val manageMediaPermissionState = rememberCanManageMediaState()
+
+    val notificationPermissionState =
+        rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
 
     Scaffold(
         topBar = {
@@ -127,6 +136,22 @@ fun WelcomeScreen(
                     isOptional = true,
                     granted = manageMediaPermissionState.value
                 )
+            }
+            item {
+                PermissionBlock(
+                    title = stringResource(R.string.notification),
+                    onClick = {
+                        notificationPermissionState.launchPermissionRequest()
+                    },
+                    details = stringResource(R.string.notification_perission_description),
+                    isOptional = true,
+                    granted = notificationPermissionState.status.isGranted
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.windowInsetsBottomHeight(
+                    WindowInsets.systemBars
+                ))
             }
 
         }
