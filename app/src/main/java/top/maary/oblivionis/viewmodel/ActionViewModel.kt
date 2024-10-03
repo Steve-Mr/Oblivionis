@@ -11,7 +11,6 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -20,10 +19,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import top.maary.oblivionis.OblivionisApplication
-import top.maary.oblivionis.data.Album
-import top.maary.oblivionis.data.ImageRepository
-import top.maary.oblivionis.data.MediaStoreImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,23 +29,25 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.maary.oblivionis.OblivionisApplication
+import top.maary.oblivionis.data.Album
+import top.maary.oblivionis.data.ImageRepository
+import top.maary.oblivionis.data.MediaStoreImage
 import java.io.File
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
 class ActionViewModel(
     application: Application,
-    private val imageRepository: ImageRepository): AndroidViewModel(application) {
+    private val imageRepository: ImageRepository
+) : AndroidViewModel(application) {
     private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
 
-    val markedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
+    val markedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
         images.filter { it.isMarked }
     }
-    val unmarkedImages : Flow<List<MediaStoreImage>> = _images.map { images ->
+    val unmarkedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
         images.filter { !it.isMarked }
-    }
-    val excludedMedia : Flow<List<MediaStoreImage>> = _images.map { images ->
-        images.filter { it.isExcluded }
     }
 
     var albumPath: String? = null
@@ -103,16 +100,17 @@ class ActionViewModel(
 
             if (videoContentObserver == null) {
 
-                videoContentObserver = getApplication<Application>().contentResolver.registerObserver(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                ) {
-                    loadImages()
-                    viewModelScope.launch {
-                        if (!databaseMarks.isNullOrEmpty()) {
-                            restoreMarkList(databaseMarks)
+                videoContentObserver =
+                    getApplication<Application>().contentResolver.registerObserver(
+                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                    ) {
+                        loadImages()
+                        viewModelScope.launch {
+                            if (!databaseMarks.isNullOrEmpty()) {
+                                restoreMarkList(databaseMarks)
+                            }
                         }
                     }
-                }
             }
         }
     }
@@ -155,12 +153,16 @@ class ActionViewModel(
             )
 
             cursor?.use {
-                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                val nameColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
                 val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
 
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(nameColumn) ?: ""
-                    val path = File(cursor.getString(pathColumn)).parent!!.replace("/storage/emulated/0/", "").replace("/storage/emulated/0", "")
+                    val path = File(cursor.getString(pathColumn)).parent!!.replace(
+                        "/storage/emulated/0/",
+                        ""
+                    ).replace("/storage/emulated/0", "")
                     // Check if this album (BUCKET_ID) is already in the map
                     val album = albumMap[path]
                     if (album == null) {
@@ -185,7 +187,7 @@ class ActionViewModel(
         }
     }
 
-    fun deleteImage(image: MediaStoreImage) {
+    private fun deleteImage(image: MediaStoreImage) {
         viewModelScope.launch {
             performDeleteImage(image)
         }
@@ -247,32 +249,29 @@ class ActionViewModel(
     }
 
     fun unMarkLastImage(): Long? {
-        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE")
-        // 检查 lastMarkedImage 是否为空
-            // 创建一个更新后的 _images 列表
-            val img = _lastMarked.value.lastOrNull() ?: return null
-        Log.v("OBLIVIONIS", "UNMARKLASTIMAGE2")
+        // 创建一个更新后的 _images 列表
+        val img = _lastMarked.value.lastOrNull() ?: return null
 
         val updatedList = _images.value.toMutableList()
 
-            // 找到 lastMarkedImage 的索引
-            val index = updatedList.indexOf(img)
+        // 找到 lastMarkedImage 的索引
+        val index = updatedList.indexOf(img)
 
-            // 确保图片在列表中存在
-            if (index != -1) {
-                // 更新 isMarked 状态为 false
-                updatedList[index] = img.copy(isMarked = false)
-                databaseUnmark(img)
+        // 确保图片在列表中存在
+        if (index != -1) {
+            // 更新 isMarked 状态为 false
+            updatedList[index] = img.copy(isMarked = false)
+            databaseUnmark(img)
 
-                // 更新 _images 的值
-                _images.value = updatedList
+            // 更新 _images 的值
+            _images.value = updatedList
 
-                // 清空 lastMarkedImage
-                _lastMarked.value = _lastMarked.value.dropLast(1)
+            // 清空 lastMarkedImage
+            _lastMarked.value = _lastMarked.value.dropLast(1)
 
-                // 返回图片的 id
-                return img.id
-            }
+            // 返回图片的 id
+            return img.id
+        }
 
         return null
 
@@ -280,7 +279,8 @@ class ActionViewModel(
 
     fun unMarkImage(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
-        updatedList[updatedList.indexOf(target.copy(isMarked = true))] = target.copy(isMarked = false)
+        updatedList[updatedList.indexOf(target.copy(isMarked = true))] =
+            target.copy(isMarked = false)
         databaseUnmark(target.copy(isMarked = true))
         _lastMarked.value = _lastMarked.value.filterNot { it == target }
         _images.value = updatedList
@@ -288,12 +288,13 @@ class ActionViewModel(
 
     fun includeMedia(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
-        updatedList[updatedList.indexOf(target.copy(isExcluded = true))] = target.copy(isExcluded = false)
+        updatedList[updatedList.indexOf(target.copy(isExcluded = true))] =
+            target.copy(isExcluded = false)
         databaseUnmark(target.copy(isExcluded = true))
         _images.value = updatedList
     }
 
-    fun clearImages() {
+    private fun clearImages() {
         _images.update { currentList ->
             currentList.filter { !it.isMarked }
         }
@@ -301,23 +302,19 @@ class ActionViewModel(
         databaseRemoveAll()
     }
 
-    fun restoreMarkList(listToMark: List<MediaStoreImage>) {
+    private fun restoreMarkList(listToMark: List<MediaStoreImage>) {
         val updatedList = _images.value.toMutableList()
-
-        Log.v("OBLIVIONIS", "RESTORE ${listToMark.size}")
-
 
         listToMark.forEach { item ->
             val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
             if (index == -1) return@forEach
             updatedList[index] = item.copy(isMarked = true)
-            Log.v("YDNM", "ITEM IS ${item in listToMark}")
         }
         _images.value = updatedList
 
     }
 
-    fun restoreExcluded(list: List<MediaStoreImage>) {
+    private fun restoreExcluded(list: List<MediaStoreImage>) {
         val updatedList = _images.value.toMutableList()
 
         list.forEach { item ->
@@ -328,33 +325,7 @@ class ActionViewModel(
         _images.value = updatedList
     }
 
-    fun restoreState() {
-        viewModelScope.launch {
-            val marks = imageRepository.allMarks?.firstOrNull()
-            val exclusions = imageRepository.allExcludes?.firstOrNull()
-            val updatedList = _images.value.toMutableList()
-
-            if (!marks.isNullOrEmpty()) {
-                marks.forEach { item ->
-                    val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
-                    if (index == -1) return@forEach
-                    updatedList[index] = item.copy(isMarked = true)
-                }
-            }
-            if (!exclusions.isNullOrEmpty()) {
-                exclusions.forEach { item ->
-                    val index = updatedList.indexOf(item.copy(isExcluded = false))
-                    if (index == -1) return@forEach
-                    updatedList[index] = item.copy(isExcluded = true)
-                }
-            }
-            _images.value = updatedList
-        }
-
-    }
-
-
-    suspend fun queryImages(): List<MediaStoreImage> {
+    private suspend fun queryImages(): List<MediaStoreImage> {
         val images = mutableListOf<MediaStoreImage>()
 
         withContext(Dispatchers.IO) {
@@ -376,8 +347,6 @@ class ActionViewModel(
                 "${albumPath}/"
             )
 
-            Log.v("OBLIVIONIS", "$selection, ${selectionArgs[0]}")
-
             val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
             for (uri in uriList) {
@@ -395,7 +364,6 @@ class ActionViewModel(
                     val displayNameColumn =
                         cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
 
-                    Log.i(TAG, "Found ${cursor.count} images")
                     while (cursor.moveToNext()) {
 
                         // Here we'll use the column index that we found above.
@@ -424,7 +392,10 @@ class ActionViewModel(
 
         withContext(Dispatchers.IO) {
             try {
-                val deleteRequest = MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, arrayListOf(image.contentUri))
+                val deleteRequest = MediaStore.createDeleteRequest(
+                    getApplication<Application>().contentResolver,
+                    arrayListOf(image.contentUri)
+                )
                 _pendingDeleteIntentSender.value = deleteRequest.intentSender
             } catch (securityException: SecurityException) {
                 val recoverableSecurityException =
@@ -440,6 +411,7 @@ class ActionViewModel(
             }
         }
     }
+
     private suspend fun performDeleteImageList(images: List<MediaStoreImage>) {
 
         withContext(Dispatchers.IO) {
@@ -480,22 +452,22 @@ class ActionViewModel(
         loadAlbums()
     }
 
-    fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
+    private fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
         imageRepository.mark(image)
     }
 
-    fun databaseUnmark(image: MediaStoreImage) = viewModelScope.launch {
+    private fun databaseUnmark(image: MediaStoreImage) = viewModelScope.launch {
         imageRepository.unmark(image)
     }
 
-    fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
+    private fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
         images.forEach {
             if (it.isExcluded) return@forEach
             imageRepository.mark(it.copy(isMarked = false))
         }
     }
 
-    fun databaseRemoveAll() = databaseUnmarkAll(_images.value)
+    private fun databaseRemoveAll() = databaseUnmarkAll(_images.value)
 
     fun removeId(id: Long) = viewModelScope.launch {
         imageRepository.removeId(id)
@@ -527,7 +499,7 @@ class ActionViewModel(
 
     @Suppress("UNCHECKED_CAST")
     companion object {
-        val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(
                 modelClass: Class<T>,
                 extras: CreationExtras
@@ -558,6 +530,3 @@ private fun ContentResolver.registerObserver(
     registerContentObserver(uri, true, contentObserver)
     return contentObserver
 }
-
-
-private const val TAG = "HistoryActivityVM"

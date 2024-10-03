@@ -16,10 +16,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import top.maary.oblivionis.data.PreferenceRepository
-import top.maary.oblivionis.ui.ActionScreen
-import top.maary.oblivionis.ui.EntryScreen
-import top.maary.oblivionis.ui.RecycleScreen
-import top.maary.oblivionis.ui.WelcomeScreen
+import top.maary.oblivionis.ui.screen.ActionScreen
+import top.maary.oblivionis.ui.screen.EntryScreen
+import top.maary.oblivionis.ui.screen.RecycleScreen
+import top.maary.oblivionis.ui.screen.WelcomeScreen
 import top.maary.oblivionis.ui.screen.SettingsScreen
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import top.maary.oblivionis.viewmodel.NotificationViewModel

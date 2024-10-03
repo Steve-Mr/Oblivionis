@@ -49,4 +49,5 @@
     <string name="select_all">Select All</string>
     <string name="restore_selected_confirmation">Selected media will be restored.</string>
     <string name="d1">1 Day</string>
+    <string name="notification_perission_description">Allow Oblivionis push notifications. Related feature still needs to be enabled in the settings.</string>
 </resources>
