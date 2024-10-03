@@ -178,7 +178,9 @@ fun ActionScreen(
                     val shareIntent = Intent.createChooser(sendIntent, null)
                     context.startActivity(shareIntent)
                 },
-                showRestore = (lastMarked.value.isNotEmpty())
+                showRestore = (lastMarked.value.isNotEmpty()),
+                currentPage = pagerState.currentPage,
+                pagesCount = images.value.size
             )
         }
 
@@ -348,10 +350,7 @@ fun ActionScreen(
                         }
                     }
                 }
-
-
             }
-
         }
     }
 }
