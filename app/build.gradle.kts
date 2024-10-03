@@ -24,9 +24,9 @@ android {
     defaultConfig {
         applicationId = "top.maary.oblivionis"
         minSdk = 31
-        targetSdk = 34
-        versionCode = 2
-        versionName = "1.0-alpha-0930"
+        targetSdk = 35
+        versionCode = 3
+        versionName = "1.0-alpha-1003"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -153,6 +153,6 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
 
-    implementation("androidx.compose.material:material-icons-extended:1.7.2")
+    implementation(libs.androidx.material.icons.extended)
 
 }
