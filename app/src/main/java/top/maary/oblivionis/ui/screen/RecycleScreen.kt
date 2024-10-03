@@ -241,19 +241,7 @@ fun RecycleScreen(
                         isMultiSelectionState = selectedItems.value.isNotEmpty(),
                         isSelected = selectedItems.value.contains(index),
                         imageLoader = imageLoader,
-                        onImageClick = {
-                            if (selectedItems.value.isNotEmpty()) {
-                                val newSet = selectedItems.value.toMutableSet() // 创建一个新集合
-                                if (!newSet.add(index)) {
-                                    newSet.remove(index) // 如果元素已存在，则移除
-                                }
-                                selectedItems.value = newSet // 更新 `selectedItems.value`，触发重组
-                                return@MediaPlayer
-                            }
-                            clickedIndex.intValue = index
-                            openDialog.value = true
-                        },
-                        onVideoClick = {
+                        onMediaClick = {
                             if (selectedItems.value.isNotEmpty()) {
                                 val newSet = selectedItems.value.toMutableSet() // 创建一个新集合
                                 if (!newSet.add(index)) {

@@ -2,7 +2,9 @@ package top.maary.oblivionis.ui
 
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -61,6 +63,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import top.maary.oblivionis.R
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaPlayer(
     modifier: Modifier,
@@ -68,33 +71,16 @@ fun MediaPlayer(
     imageLoader: ImageLoader,
     isMultiSelectionState: Boolean = false,
     isSelected: Boolean = false, // 用于表示当前项是否被选中
-    onImageClick: () -> Unit = {},
-    onVideoClick: () -> Unit = {},
+    onMediaClick: () -> Unit = {},
     onLongPress: () -> Unit = {} // 长按事件
 ) {
     Box(
         modifier = Modifier
             .wrapContentSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onLongPress = {
-                        onLongPress() // 处理长按事件
-                    },
-                    onTap = {
-                        if (uri
-                                .toString()
-                                .startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())
-                        ) {
-                            onImageClick()
-                        } else if (uri
-                                .toString()
-                                .startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString())
-                        ) {
-                            onVideoClick()
-                        }
-                    }
-                )
-            }
+            .combinedClickable (
+                onLongClick = { onLongPress() },
+                onClick = { onMediaClick() }
+            )
     ) {
         when {
             // 处理图片显示
@@ -326,14 +312,13 @@ fun VideoViewAlt(
 ) {
     Box(
         modifier = modifier
-            .clickable { onClick() }, contentAlignment = Alignment.BottomEnd
+        , contentAlignment = Alignment.BottomEnd
     ) {
         AsyncImage(
             model = uri,
             contentDescription = "",
             imageLoader = imageLoader,
             modifier = modifier
-                .clickable { onClick() }
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
         )

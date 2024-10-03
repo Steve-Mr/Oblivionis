@@ -2,6 +2,7 @@ package top.maary.oblivionis.ui.screen
 
 import android.content.Intent
 import android.provider.MediaStore
+import android.util.Log
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
@@ -321,13 +322,15 @@ fun ActionScreen(
                     MediaPlayer(modifier = Modifier.fillMaxWidth(),
                         uri = uri,
                         imageLoader = imageLoader,
-                        onVideoClick = {
+                        onMediaClick = {
+                            Log.v("OBLIVIONIS", "IMAGE CLICK")
                             context.startActivity(
                                 Intent.createChooser(
                                     intent, context.getString(R.string.choose_app)
                                 )
                             )
-                        })
+                        }
+                    )
                     if (images.value[page].isExcluded) {
                         IconButton(
                             onClick = {}, colors = IconButtonColors(
