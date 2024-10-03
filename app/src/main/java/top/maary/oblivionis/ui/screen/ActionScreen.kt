@@ -156,7 +156,7 @@ fun ActionScreen(
                 modifier = Modifier.navigationBarsPadding(),
                 delButtonClickable = images.value.isNotEmpty(),
                 onDelButtonClicked = {
-                    if (images.value.isNotEmpty()) {/* TODO ANIMATION? Long press listener with animation */
+                    if (images.value.isNotEmpty()) {
                         viewModel.markImage(pagerState.currentPage)
                     }
                 },
