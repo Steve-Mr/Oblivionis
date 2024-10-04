@@ -2,6 +2,7 @@ package top.maary.oblivionis.ui
 
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -221,14 +222,14 @@ fun ActionRow(
         ) {
             OutlinedButton(
                 onClick = {},
-                modifier = Modifier
-                    .height(48.dp)
+                modifier = Modifier.height(48.dp),
+                enabled = (pagesCount != 0)
             ) {
                 Text(
                     modifier = Modifier.padding(start = 8.dp, end = 32.dp),
-                    text = stringResource(R.string.pager_count, currentPage, pagesCount)
+                    text = stringResource(R.string.pager_count,
+                        if (pagesCount == 0) 0 else currentPage, pagesCount)
                 )
-
             }
             if (loading) {
                 LinearProgressIndicator(
