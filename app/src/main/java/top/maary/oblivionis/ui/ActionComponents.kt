@@ -58,7 +58,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -85,7 +84,8 @@ fun MediaPlayer(
     onLongPress: () -> Unit = {} // 长按事件
 ) {
     Box(
-        modifier = modifier.clip(RoundedCornerShape(8.dp))
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
             .wrapContentSize()
             .combinedClickable(
                 onLongClick = { onLongPress() },
@@ -114,8 +114,15 @@ fun MediaPlayer(
 
         if (isMultiSelectionState) {
             // 显示选择框的图标
-            Icon(imageVector = Icons.Default.Circle, contentDescription = null, tint = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                modifier = Modifier.align(Alignment.TopEnd).size(48.dp).padding(8.dp))
+            Icon(
+                imageVector = Icons.Default.Circle,
+                contentDescription = null,
+                tint = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(48.dp)
+                    .padding(8.dp)
+            )
             Icon(
                 imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                 contentDescription = if (isSelected) "Selected" else "Not Selected",
@@ -212,32 +219,24 @@ fun ActionRow(
                 .align(Alignment.Center)
                 .wrapContentWidth()
         ) {
-            ConstraintLayout {
-                val (button, progressBar) = createRefs()
-                OutlinedButton(
-                    onClick = {},
-                    modifier = Modifier.constrainAs(button){
-                    }
-                        .height(48.dp)
-                ) {
-                    Text(
-                        modifier = Modifier.padding(start = 8.dp, end = 32.dp),
-                        text = stringResource(R.string.pager_count, currentPage, pagesCount)
-                    )
+            OutlinedButton(
+                onClick = {},
+                modifier = Modifier
+                    .height(48.dp)
+            ) {
+                Text(
+                    modifier = Modifier.padding(start = 8.dp, end = 32.dp),
+                    text = stringResource(R.string.pager_count, currentPage, pagesCount)
+                )
 
-                }
-                if (loading) {
-                    LinearProgressIndicator(
-                        progress = { currentProgress },
-                        modifier = Modifier
-                            .height(48.dp).constrainAs(progressBar) {
-                                start.linkTo(button.start)
-                                end.linkTo(button.end)
-                                top.linkTo(button.top)
-                                bottom.linkTo(button.bottom)
-                            }
-                    )
-                }
+            }
+            if (loading) {
+                LinearProgressIndicator(
+                    progress = { currentProgress },
+                    modifier = Modifier
+                        .height(48.dp)
+                        .matchParentSize()
+                )
             }
             Button(
                 onClick = { },
