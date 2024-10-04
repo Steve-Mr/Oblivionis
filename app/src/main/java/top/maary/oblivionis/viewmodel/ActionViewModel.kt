@@ -465,7 +465,7 @@ class ActionViewModel(
     private fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
         images.forEach {
             if (it.isExcluded) return@forEach
-            imageRepository.mark(it.copy(isMarked = false))
+            imageRepository.mark(it.copy(isMarked = true))
         }
     }
 
