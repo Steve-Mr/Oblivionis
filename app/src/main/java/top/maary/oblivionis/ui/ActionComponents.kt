@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
@@ -113,6 +114,8 @@ fun MediaPlayer(
 
         if (isMultiSelectionState) {
             // 显示选择框的图标
+            Icon(imageVector = Icons.Default.Circle, contentDescription = null, tint = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                modifier = Modifier.align(Alignment.TopEnd).size(48.dp).padding(8.dp))
             Icon(
                 imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                 contentDescription = if (isSelected) "Selected" else "Not Selected",

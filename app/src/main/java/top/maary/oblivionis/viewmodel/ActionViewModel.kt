@@ -279,8 +279,9 @@ class ActionViewModel(
 
     fun unMarkImage(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
-        updatedList[updatedList.indexOf(target.copy(isMarked = true))] =
-            target.copy(isMarked = false)
+        val index = updatedList.indexOf(target.copy(isMarked = true))
+        if (index == -1) return
+        updatedList[index] = target.copy(isMarked = false)
         databaseUnmark(target.copy(isMarked = true))
         _lastMarked.value = _lastMarked.value.filterNot { it == target }
         _images.value = updatedList
@@ -288,8 +289,9 @@ class ActionViewModel(
 
     fun includeMedia(target: MediaStoreImage) {
         val updatedList = _images.value.toMutableList()
-        updatedList[updatedList.indexOf(target.copy(isExcluded = true))] =
-            target.copy(isExcluded = false)
+        val index = updatedList.indexOf(target.copy(isExcluded = true))
+        if (index == -1) return
+        updatedList[index] = target.copy(isExcluded = false)
         databaseUnmark(target.copy(isExcluded = true))
         _images.value = updatedList
     }

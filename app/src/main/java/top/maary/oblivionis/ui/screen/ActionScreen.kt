@@ -179,7 +179,7 @@ fun ActionScreen(
                     context.startActivity(shareIntent)
                 },
                 showRestore = (lastMarked.value.isNotEmpty()),
-                currentPage = pagerState.currentPage,
+                currentPage = pagerState.currentPage +1,
                 pagesCount = images.value.size
             )
         }
