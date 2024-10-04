@@ -19,14 +19,14 @@ keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 
 android {
     namespace = "top.maary.oblivionis"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "top.maary.oblivionis"
         minSdk = 31
-        targetSdk = 34
-        versionCode = 2
-        versionName = "1.0-alpha-0930"
+        targetSdk = 35
+        versionCode = 3
+        versionName = "1.0-alpha-1003"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -130,29 +130,21 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.coil.compose)
     implementation(libs.coil3.coil.video)
-
     implementation(libs.accompanist.permissions)
-
     implementation(libs.androidx.room.runtime)
     annotationProcessor(libs.androidx.room.compiler)
-
     // To use Kotlin Symbol Processing (KSP)
     ksp(libs.androidx.room.compiler)
-
     // optional - Kotlin Extensions and Coroutines support for Room
     implementation(libs.androidx.room.ktx)
-
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
-
     implementation(libs.compose.video)
     implementation(libs.androidx.media3.session)
-
     implementation(libs.androidx.foundation)
-
     implementation(libs.androidx.datastore.preferences)
-
-    implementation("androidx.compose.material:material-icons-extended:1.7.2")
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.constraintlayout.compose)
 
 }
