@@ -50,4 +50,5 @@
     <string name="select_all">全部选择</string>
     <string name="restore_selected_confirmation">被选中的媒体将会被恢复。</string>
     <string name="d1">1 天</string>
+    <string name="notification_perission_description">允许应用推送通知。相关的功能仍需在设置中启用。</string>
 </resources>
