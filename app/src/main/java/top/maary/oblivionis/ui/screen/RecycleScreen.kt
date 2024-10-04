@@ -27,8 +27,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -219,7 +217,6 @@ fun RecycleScreen(
                     )
                 }
                 items(images.value.size) { index ->
-                    val isSelected by remember { derivedStateOf { selectedItems.value.contains(index) } }
 
                     if (openDialog.value) {
                         Dialog(
@@ -236,7 +233,7 @@ fun RecycleScreen(
                     MediaPlayer(
                         modifier = Modifier
                             .padding(2.dp)
-                            .background(if (isSelected) Color.Gray else Color.Transparent),
+                            .background(Color.Transparent),
                         uri = images.value[index].contentUri,
                         isMultiSelectionState = selectedItems.value.isNotEmpty(),
                         isSelected = selectedItems.value.contains(index),

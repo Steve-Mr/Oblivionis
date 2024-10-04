@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -82,7 +84,7 @@ fun MediaPlayer(
     onLongPress: () -> Unit = {} // 长按事件
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier.clip(RoundedCornerShape(8.dp))
             .wrapContentSize()
             .combinedClickable(
                 onLongClick = { onLongPress() },
@@ -95,15 +97,14 @@ fun MediaPlayer(
                 AsyncImage(
                     model = uri,
                     contentDescription = "",
-                    modifier = modifier
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier = modifier.clip(RoundedCornerShape(8.dp))
                 )
             }
 
             // 处理视频显示
             uri.toString().startsWith(MediaStore.Video.Media.EXTERNAL_CONTENT_URI.toString()) -> {
                 VideoViewAlt(
-                    modifier = modifier,
+                    modifier = modifier.clip(RoundedCornerShape(8.dp)),
                     uri = uri,
                     imageLoader = imageLoader
                 )
@@ -119,7 +120,7 @@ fun MediaPlayer(
                     .align(Alignment.TopEnd) // 选择框显示在右上角
                     .size(48.dp)
                     .padding(8.dp),
-                tint = if (isSelected) Color.Blue else Color.Gray // 设置选中的颜色
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray // 设置选中的颜色
             )
         }
 
@@ -143,7 +144,7 @@ fun ActionRow(
 
     val viewConfiguration = LocalViewConfiguration.current
 
-    var currentProgress by remember { mutableStateOf(0f) }
+    var currentProgress by remember { mutableFloatStateOf(0f) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope() // Create a coroutine scope
 
@@ -206,28 +207,34 @@ fun ActionRow(
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .width(128.dp)
+                .wrapContentWidth()
         ) {
-            OutlinedButton(
-                onClick = {},
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .height(48.dp)
-            ) {
-                Text(
-                    modifier = Modifier.padding(start = 8.dp, end = 32.dp),
-                    text = stringResource(R.string.pager_count, currentPage, pagesCount)
-                )
-
-            }
-            if (loading) {
-                LinearProgressIndicator(
-                    progress = { currentProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
+            ConstraintLayout {
+                val (button, progressBar) = createRefs()
+                OutlinedButton(
+                    onClick = {},
+                    modifier = Modifier.constrainAs(button){
+                    }
                         .height(48.dp)
-                        .align(Alignment.TopStart),
-                )
+                ) {
+                    Text(
+                        modifier = Modifier.padding(start = 8.dp, end = 32.dp),
+                        text = stringResource(R.string.pager_count, currentPage, pagesCount)
+                    )
+
+                }
+                if (loading) {
+                    LinearProgressIndicator(
+                        progress = { currentProgress },
+                        modifier = Modifier
+                            .height(48.dp).constrainAs(progressBar) {
+                                start.linkTo(button.start)
+                                end.linkTo(button.end)
+                                top.linkTo(button.top)
+                                bottom.linkTo(button.bottom)
+                            }
+                    )
+                }
             }
             Button(
                 onClick = { },

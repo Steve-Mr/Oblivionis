@@ -3,13 +3,11 @@ accompanistPermissions = "0.36.0"
 agp = "8.6.1"
 coil = "3.0.0-alpha10"
 coilCompose = "3.0.0-alpha10"
-coilVideo = "2.7.0"
 coilVideoVersion = "3.0.0-alpha10"
-compose = "1.0.0-beta01"
 composeVideo = "1.2.0"
+constraintlayoutCompose = "1.1.0-beta01"
 datastorePreferences = "1.1.1"
 foundation = "1.7.3"
-glide = "4.16.0"
 kotlin = "1.9.0"
 coreKtx = "1.13.1"
 junit = "4.13.2"
@@ -31,6 +29,7 @@ workRuntimeKtx = "2.9.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
+androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayoutCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "foundation" }
@@ -48,11 +47,8 @@ androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx"
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 coil = { module = "io.coil-kt.coil3:coil-android", version.ref = "coil" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose-android", version.ref = "coilCompose" }
-coil-video = { module = "io.coil-kt:coil-video", version.ref = "coilVideo" }
 coil3-coil-video = { module = "io.coil-kt.coil3:coil-video", version.ref = "coilVideoVersion" }
-compose = { module = "com.github.bumptech.glide:compose", version.ref = "compose" }
 compose-video = { module = "io.sanghun:compose-video", version.ref = "composeVideo" }
-glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

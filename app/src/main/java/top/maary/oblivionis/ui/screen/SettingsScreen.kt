@@ -1,7 +1,9 @@
 package top.maary.oblivionis.ui.screen
 
 import android.Manifest
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,7 +30,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -49,6 +49,7 @@ import java.util.Date
  * 通知设置——是否启用/通知频率/时间/何时重置/开始提醒时间
  * about
  * */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(
@@ -256,13 +257,15 @@ fun SettingsScreen(
             }
 
             item {
-                TextContent(
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
-                    title = stringResource(R.string.app_name),
-                    description = context.packageManager.getPackageInfo(
-                        context.packageName, 0
-                    ).versionName
-                )
+                context.packageManager.getPackageInfo(
+                    context.packageName, 0
+                ).versionName?.let {
+                    TextContent(
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                        title = stringResource(R.string.app_name),
+                        description = it
+                    )
+                }
             }
 
             // item { Button({ notificationViewModel.testN() }) { } }
