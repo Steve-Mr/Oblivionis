@@ -36,6 +36,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -193,8 +194,8 @@ fun ActionScreen(
             return@Scaffold
         }
 
-        var dragOffset by remember { mutableStateOf(0f) }
-        var swipeScale by remember { mutableStateOf(1f) }
+        var dragOffset by remember { mutableFloatStateOf(0f) }
+        var swipeScale by remember { mutableFloatStateOf(1f) }
         val density = LocalDensity.current.density // 获取屏幕密度
         val configuration = LocalConfiguration.current
 
