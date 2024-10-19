@@ -77,43 +77,63 @@ class ActionViewModel(
             _images.value = imageList
 
             val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            if (!databaseMarks.isNullOrEmpty()) {
-                restoreMarkList(databaseMarks)
-            }
             val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
-            if (!databaseExclusions.isNullOrEmpty()) {
-                restoreExcluded(databaseExclusions)
-            }
 
-            if (contentObserver == null) {
-                contentObserver = getApplication<Application>().contentResolver.registerObserver(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                ) {
-                    loadImages()
-                    viewModelScope.launch {
-                        if (!databaseMarks.isNullOrEmpty()) {
-                            restoreMarkList(databaseMarks)
-                        }
-                    }
-                }
-            }
+            restoreData(databaseMarks, databaseExclusions)
 
-            if (videoContentObserver == null) {
+            registerContentObserverIfNeeded()
+            registerVideoContentObserverIfNeeded()
+        }
+    }
 
-                videoContentObserver =
-                    getApplication<Application>().contentResolver.registerObserver(
-                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                    ) {
-                        loadImages()
-                        viewModelScope.launch {
-                            if (!databaseMarks.isNullOrEmpty()) {
-                                restoreMarkList(databaseMarks)
-                            }
-                        }
-                    }
+    private fun restoreData(databaseMarks: List<MediaStoreImage>?, databaseExclusions: List<MediaStoreImage>?) {
+        databaseMarks?.let { restoreMarkList(it) }
+        databaseExclusions?.let { restoreExcluded(it) }
+    }
+
+    private fun registerContentObserverIfNeeded() {
+        if (contentObserver == null) {
+            contentObserver = getApplication<Application>().contentResolver.registerObserver(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            ) {
+                reloadContentIfNeeded()
             }
         }
     }
+
+    private fun registerVideoContentObserverIfNeeded() {
+        if (videoContentObserver == null) {
+            videoContentObserver = getApplication<Application>().contentResolver.registerObserver(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            ) {
+                reloadContentIfNeeded()
+            }
+        }
+    }
+
+    private var isReloading = false
+
+    private fun reloadContentIfNeeded() {
+        if (!isReloading) {
+            isReloading = true
+            viewModelScope.launch {
+                reloadContent()
+                isReloading = false  // 加载完成后重置标记位
+            }
+        }
+    }
+
+    private fun reloadContent() {
+        loadImages()
+        loadAlbums()
+        viewModelScope.launch {
+            val databaseMarks = imageRepository.allMarks?.firstOrNull()
+            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
+            restoreData(databaseMarks, databaseExclusions)
+        }
+    }
+
+
 
     private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> get() = _albums
@@ -123,7 +143,6 @@ class ActionViewModel(
             val albumList = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
             _albums.value = albumList
         }
-
     }
 
     // Function to fetch album names and paths from MediaStore for both images and videos
