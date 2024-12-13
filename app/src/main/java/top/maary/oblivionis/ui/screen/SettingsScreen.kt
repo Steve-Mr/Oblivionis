@@ -151,7 +151,10 @@ fun SettingsScreen(
 
 
                     } else {
-                        notificationViewModel.cancelNotification()
+                        scope.launch {
+                            dataStore.setNotificationEnabled(false)
+                            notificationViewModel.cancelNotification()
+                        }
                     }
                 }
             }
