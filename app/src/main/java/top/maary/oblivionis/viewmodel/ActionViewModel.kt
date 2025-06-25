@@ -24,16 +24,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import top.maary.oblivionis.OblivionisApplication
 import top.maary.oblivionis.data.Album
 import top.maary.oblivionis.data.ImageRepository
 import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.PreferenceRepository
 import java.io.File
+import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -111,14 +115,18 @@ class ActionViewModel(
         }
     }
 
-    private var isReloading = false
+    private val reloadMutex = Mutex()
 
     private fun reloadContentIfNeeded() {
-        if (!isReloading) {
-            isReloading = true
-            viewModelScope.launch {
-                reloadContent()
-                isReloading = false  // 加载完成后重置标记位
+        viewModelScope.launch {
+            // 尝试获取锁，如果已经被锁定，则直接返回
+            if (reloadMutex.tryLock()) {
+                try {
+                    reloadContent()
+                } finally {
+                    // 确保在任务完成后释放锁
+                    reloadMutex.unlock()
+                }
             }
         }
     }
@@ -216,6 +224,33 @@ class ActionViewModel(
         pendingDeleteImage?.let { image ->
             pendingDeleteImage = null
             deleteImage(image)
+        }
+    }
+
+    fun deleteMarkedImagesAndRescheduleNotification(
+        images: List<MediaStoreImage>,
+        dataStore: PreferenceRepository,
+        notificationViewModel: NotificationViewModel
+    ) {
+        viewModelScope.launch {
+            // 先执行删除
+            performDeleteImageList(images)
+            clearImages()
+            loadAlbums()
+
+            // 然后检查是否需要重新调度通知（这里是异步挂起，不会阻塞）
+            if (!dataStore.intervalStartFixed.first()) {
+                val calendar = Calendar.getInstance()
+                val notificationTime = dataStore.notificationTime.first()
+                val timeParts = notificationTime.split(":").map { it.toInt() }
+                dataStore.setIntervalStart(calendar.get(Calendar.DAY_OF_MONTH))
+                notificationViewModel.scheduleNotification(
+                    date = calendar.get(Calendar.DAY_OF_MONTH),
+                    hour = timeParts[0],
+                    minute = timeParts[1],
+                    interval = dataStore.notificationInterval.first().toLong()
+                )
+            }
         }
     }
 
