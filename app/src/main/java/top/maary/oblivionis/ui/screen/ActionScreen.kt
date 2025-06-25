@@ -203,7 +203,7 @@ fun ActionScreen(
 
         if (images.value.isEmpty()) {
             PlaceHolder(
-                modifier = Modifier.padding(innerPadding), stringResource = R.string.congratulations
+                modifier = Modifier, stringResource = R.string.congratulations
             )
             return@Scaffold
         }
@@ -214,6 +214,7 @@ fun ActionScreen(
         val configuration = LocalConfiguration.current
 
         HorizontalPager(
+            modifier = Modifier.padding(innerPadding),
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 64.dp),
             verticalAlignment = Alignment.CenterVertically,

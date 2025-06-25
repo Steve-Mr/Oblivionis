@@ -457,7 +457,7 @@ fun PlaceHolder(
 ) {
     Box(
         modifier = modifier
-            .fillMaxSize(), contentAlignment = Alignment.BottomCenter
+            .fillMaxSize(), contentAlignment = Alignment.Center
     ) {
 
         Card(
