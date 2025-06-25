@@ -6,6 +6,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -70,7 +71,7 @@ fun OblivionisApp(
     NavHost(
         popExitTransition = {
             scaleOut(
-                targetScale = 0.9f,
+                targetScale = 0.8f,
                 transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f)
             )
         },
@@ -89,7 +90,6 @@ fun OblivionisApp(
         composable (route = OblivionisScreen.Welcome.name) {
             Log.v("OBLIVIONIS", "PERMISSION 2")
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
                 shadowElevation = 8.dp,
                 tonalElevation = 8.dp
             ) {
@@ -103,7 +103,6 @@ fun OblivionisApp(
         }
         composable (route = OblivionisScreen.Entry.name) {
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
                 shadowElevation = 8.dp,
                 tonalElevation = 8.dp
             ) {
@@ -118,7 +117,6 @@ fun OblivionisApp(
         }
         composable (route = OblivionisScreen.Action.name) {
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
                 shadowElevation = 8.dp,
                 tonalElevation = 8.dp
             ) {
@@ -130,7 +128,6 @@ fun OblivionisApp(
         }
         composable (route = OblivionisScreen.Recycle.name) {
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
                 shadowElevation = 8.dp,
                 tonalElevation = 8.dp
             ) {
@@ -142,7 +139,6 @@ fun OblivionisApp(
         }
         composable (route = OblivionisScreen.Settings.name) {
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
                 shadowElevation = 8.dp,
                 tonalElevation = 8.dp
             ) {
