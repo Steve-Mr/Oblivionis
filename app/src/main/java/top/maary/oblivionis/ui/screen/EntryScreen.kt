@@ -57,24 +57,17 @@ fun EntryScreen(
         topBar = {
             LargeTopAppBar(
                 modifier = Modifier
-                    .fillMaxHeight(0.3f)
                     .shadow(10.dp),
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 title = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.BottomStart
-                    ) {
                         Text(
                             stringResource(id = R.string.happy_deleting),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    }
-
                 },
                 actions = {
                     Button(

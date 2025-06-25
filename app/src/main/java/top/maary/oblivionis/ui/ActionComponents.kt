@@ -29,6 +29,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -451,7 +452,7 @@ fun Dialog(
 
 @Composable
 fun PlaceHolder(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     stringResource: Int
 ) {
     Box(
@@ -459,11 +460,10 @@ fun PlaceHolder(
             .fillMaxSize(), contentAlignment = Alignment.Center
     ) {
 
-        ElevatedCard(
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+        Card(
             modifier = Modifier
                 .fillMaxWidth(0.8f)
-                .fillMaxHeight(0.3f)
+                .height(250.dp)
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
