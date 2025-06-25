@@ -88,7 +88,11 @@ fun OblivionisApp(
     ){
         composable (route = OblivionisScreen.Welcome.name) {
             Log.v("OBLIVIONIS", "PERMISSION 2")
-            Surface(modifier = Modifier.clip(RoundedCornerShape(16.dp))) {
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                shadowElevation = 8.dp,
+                tonalElevation = 8.dp
+            ) {
                 WelcomeScreen (onPermissionFinished = {
                     if (isReWelcome.value) return@WelcomeScreen
                     welcomePermissionBasicLogic()
@@ -98,7 +102,11 @@ fun OblivionisApp(
             }
         }
         composable (route = OblivionisScreen.Entry.name) {
-            Surface(modifier = Modifier.clip(RoundedCornerShape(16.dp))) {
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                shadowElevation = 8.dp,
+                tonalElevation = 8.dp
+            ) {
                 EntryScreen(
                     viewModel = actionViewModel,
                     onAlbumClick = {
@@ -109,7 +117,11 @@ fun OblivionisApp(
             }
         }
         composable (route = OblivionisScreen.Action.name) {
-            Surface(modifier = Modifier.clip(RoundedCornerShape(16.dp))) {
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                shadowElevation = 8.dp,
+                tonalElevation = 8.dp
+            ) {
                 ActionScreen (
                     viewModel = actionViewModel,
                     onNextButtonClicked = { navController.navigate(OblivionisScreen.Recycle.name)},
@@ -117,7 +129,11 @@ fun OblivionisApp(
             }
         }
         composable (route = OblivionisScreen.Recycle.name) {
-            Surface(modifier = Modifier.clip(RoundedCornerShape(16.dp))) {
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                shadowElevation = 8.dp,
+                tonalElevation = 8.dp
+            ) {
                 RecycleScreen(
                     actionViewModel = actionViewModel,
                     notificationViewModel = notificationViewModel,
@@ -125,7 +141,11 @@ fun OblivionisApp(
             }
         }
         composable (route = OblivionisScreen.Settings.name) {
-            Surface(modifier = Modifier.clip(RoundedCornerShape(16.dp))) {
+            Surface(
+                modifier = Modifier.clip(RoundedCornerShape(16.dp)),
+                shadowElevation = 8.dp,
+                tonalElevation = 8.dp
+            ) {
                 SettingsScreen(
                     onReWelcomeClick = {
                         scope.launch { dataStore.setReWelcome(true) }
