@@ -123,23 +123,14 @@ fun RecycleScreen(
                         Dialog(
                             onDismissRequest = { openDialog.value = false },
                             onConfirmation = {
-                                if (runBlocking { !dataStore.intervalStartFixed.first() }){
-                                    scope.launch {
-                                        val calendar = Calendar.getInstance()
-                                        val notificationTime = runBlocking { dataStore.notificationTime.first() }
-                                        val timeParts = notificationTime.split(":").map { it.toInt() }
-                                        dataStore.setIntervalStart(calendar.get(Calendar.DAY_OF_MONTH))
-                                        notificationViewModel.scheduleNotification(
-                                            date = calendar.get(Calendar.DAY_OF_MONTH),
-                                            hour = timeParts[0],
-                                            minute = timeParts[1],
-                                            interval = runBlocking { dataStore.notificationInterval.first().toLong() }
-                                        )
-                                    }
-                                }
-
-                                actionViewModel.deleteImages(images.value)
-                                openDialog.value = false },
+                                // 直接调用 ViewModel 的方法，移除 runBlocking 和 scope.launch
+                                actionViewModel.deleteMarkedImagesAndRescheduleNotification(
+                                    images.value,
+                                    dataStore,
+                                    notificationViewModel
+                                )
+                                openDialog.value = false
+                            },
                             dialogText = stringResource(id = R.string.deleteAllConfirmation)
                         )
                     }
@@ -204,7 +195,7 @@ fun RecycleScreen(
         val clickedIndex = remember { mutableIntStateOf(-1) }
 
         if (images.value.isEmpty()) {
-            PlaceHolder(modifier = Modifier.padding(innerPadding), stringResource = R.string.nothing_to_do)
+            PlaceHolder(modifier = Modifier, stringResource = R.string.nothing_to_do)
             return@Scaffold
         }
 

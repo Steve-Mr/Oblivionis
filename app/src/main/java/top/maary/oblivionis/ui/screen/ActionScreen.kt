@@ -32,9 +32,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -74,9 +76,27 @@ fun ActionScreen(
 
     val images = viewModel.unmarkedImages.collectAsState(initial = emptyList())
 
-    val lastMarked = viewModel.lastMarked.collectAsState()
-
     val marked = viewModel.markedImages.collectAsState(initial = emptyList())
+
+    val markedCount = viewModel.markedImages.collectAsState(initial = emptyList()).value.size
+    val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
+    val badgeDefaultsColor = BadgeDefaults.containerColor
+
+    val badgeColor by remember(markedCount, secondaryContainerColor, badgeDefaultsColor) {
+        derivedStateOf {
+            // 2. 在 derivedStateOf 中使用已经获取到的颜色值
+            if (markedCount == 0) {
+                secondaryContainerColor
+            } else {
+                badgeDefaultsColor
+            }
+        }
+    }
+
+    val lastMarkedCount = viewModel.lastMarked.collectAsState().value.size
+    val showRestore by remember(lastMarkedCount) {
+        derivedStateOf { lastMarkedCount > 0 }
+    }
 
     val pagerState = rememberPagerState(pageCount = { images.value.size })
 
@@ -101,10 +121,9 @@ fun ActionScreen(
 
         topBar = {
             CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f),
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                ),
+                    titleContentColor = MaterialTheme.colorScheme.primary),
                 title = { },
                 navigationIcon = {
                     FilledTonalButton(
@@ -124,11 +143,6 @@ fun ActionScreen(
                     }
                 },
                 actions = {
-                    val badgeColor = if (marked.value.isEmpty()) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        BadgeDefaults.containerColor
-                    }
                     BadgedBox(modifier = Modifier.padding(end = 8.dp),
                         badge = { Badge(containerColor = badgeColor) { Text(text = marked.value.size.toString()) } }) {
                         FilledTonalButton(
@@ -179,7 +193,7 @@ fun ActionScreen(
                     val shareIntent = Intent.createChooser(sendIntent, null)
                     context.startActivity(shareIntent)
                 },
-                showRestore = (lastMarked.value.isNotEmpty()),
+                showRestore = showRestore,
                 currentPage = pagerState.currentPage +1,
                 pagesCount = images.value.size
             )
@@ -189,7 +203,7 @@ fun ActionScreen(
 
         if (images.value.isEmpty()) {
             PlaceHolder(
-                modifier = Modifier.padding(innerPadding), stringResource = R.string.congratulations
+                modifier = Modifier, stringResource = R.string.congratulations
             )
             return@Scaffold
         }
@@ -200,6 +214,7 @@ fun ActionScreen(
         val configuration = LocalConfiguration.current
 
         HorizontalPager(
+            modifier = Modifier.padding(innerPadding),
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 64.dp),
             verticalAlignment = Alignment.CenterVertically,

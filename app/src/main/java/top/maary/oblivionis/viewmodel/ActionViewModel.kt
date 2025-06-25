@@ -24,16 +24,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import top.maary.oblivionis.OblivionisApplication
 import top.maary.oblivionis.data.Album
 import top.maary.oblivionis.data.ImageRepository
 import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.PreferenceRepository
 import java.io.File
+import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -73,14 +77,36 @@ class ActionViewModel(
      */
     fun loadImages() {
         viewModelScope.launch {
+            // 1. 从 MediaStore 查询图片
             val imageList = queryImages()
-            _images.value = imageList
 
+            // 2. 从数据库获取已标记和已排除的图片信息
             val databaseMarks = imageRepository.allMarks?.firstOrNull()
             val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
 
-            restoreData(databaseMarks, databaseExclusions)
+            // 3. 创建一个可变列表，用于在内存中应用状态更新
+            val updatedList = imageList.toMutableList()
 
+            // 应用标记状态
+            databaseMarks?.forEach { markedImageFromDb ->
+                val index = updatedList.indexOfFirst { it.id == markedImageFromDb.id }
+                if (index != -1) {
+                    updatedList[index] = updatedList[index].copy(isMarked = true)
+                }
+            }
+
+            // 应用排除状态
+            databaseExclusions?.forEach { excludedImageFromDb ->
+                val index = updatedList.indexOfFirst { it.id == excludedImageFromDb.id }
+                if (index != -1) {
+                    updatedList[index] = updatedList[index].copy(isExcluded = true)
+                }
+            }
+
+            // 4. 用最终处理好的列表，一次性地、原子性地更新 StateFlow
+            _images.value = updatedList
+
+            // 5. 注册内容观察者
             registerContentObserverIfNeeded()
             registerVideoContentObserverIfNeeded()
         }
@@ -111,14 +137,18 @@ class ActionViewModel(
         }
     }
 
-    private var isReloading = false
+    private val reloadMutex = Mutex()
 
     private fun reloadContentIfNeeded() {
-        if (!isReloading) {
-            isReloading = true
-            viewModelScope.launch {
-                reloadContent()
-                isReloading = false  // 加载完成后重置标记位
+        viewModelScope.launch {
+            // 尝试获取锁，如果已经被锁定，则直接返回
+            if (reloadMutex.tryLock()) {
+                try {
+                    reloadContent()
+                } finally {
+                    // 确保在任务完成后释放锁
+                    reloadMutex.unlock()
+                }
             }
         }
     }
@@ -216,6 +246,33 @@ class ActionViewModel(
         pendingDeleteImage?.let { image ->
             pendingDeleteImage = null
             deleteImage(image)
+        }
+    }
+
+    fun deleteMarkedImagesAndRescheduleNotification(
+        images: List<MediaStoreImage>,
+        dataStore: PreferenceRepository,
+        notificationViewModel: NotificationViewModel
+    ) {
+        viewModelScope.launch {
+            // 先执行删除
+            performDeleteImageList(images)
+            clearImages()
+            loadAlbums()
+
+            // 然后检查是否需要重新调度通知（这里是异步挂起，不会阻塞）
+            if (!dataStore.intervalStartFixed.first()) {
+                val calendar = Calendar.getInstance()
+                val notificationTime = dataStore.notificationTime.first()
+                val timeParts = notificationTime.split(":").map { it.toInt() }
+                dataStore.setIntervalStart(calendar.get(Calendar.DAY_OF_MONTH))
+                notificationViewModel.scheduleNotification(
+                    date = calendar.get(Calendar.DAY_OF_MONTH),
+                    hour = timeParts[0],
+                    minute = timeParts[1],
+                    interval = dataStore.notificationInterval.first().toLong()
+                )
+            }
         }
     }
 
