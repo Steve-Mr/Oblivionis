@@ -1,11 +1,16 @@
 package top.maary.oblivionis
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.scaleOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -26,6 +31,7 @@ import top.maary.oblivionis.viewmodel.NotificationViewModel
 
 enum class OblivionisScreen() { Welcome, Entry, Action, Recycle, Settings }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun OblivionisApp(
     navController: NavHostController = rememberNavController(),
@@ -57,6 +63,15 @@ fun OblivionisApp(
     }
 
     NavHost(
+        popExitTransition = {
+            scaleOut(
+                targetScale = 0.8f,
+                transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f)
+            )
+        },
+        popEnterTransition = {
+            EnterTransition.None
+        },
         navController = navController,
         startDestination =
         if (runBlocking { dataStore.permissionGranted.first() }) {
