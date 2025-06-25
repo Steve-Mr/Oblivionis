@@ -77,14 +77,36 @@ class ActionViewModel(
      */
     fun loadImages() {
         viewModelScope.launch {
+            // 1. 从 MediaStore 查询图片
             val imageList = queryImages()
-            _images.value = imageList
 
+            // 2. 从数据库获取已标记和已排除的图片信息
             val databaseMarks = imageRepository.allMarks?.firstOrNull()
             val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
 
-            restoreData(databaseMarks, databaseExclusions)
+            // 3. 创建一个可变列表，用于在内存中应用状态更新
+            val updatedList = imageList.toMutableList()
 
+            // 应用标记状态
+            databaseMarks?.forEach { markedImageFromDb ->
+                val index = updatedList.indexOfFirst { it.id == markedImageFromDb.id }
+                if (index != -1) {
+                    updatedList[index] = updatedList[index].copy(isMarked = true)
+                }
+            }
+
+            // 应用排除状态
+            databaseExclusions?.forEach { excludedImageFromDb ->
+                val index = updatedList.indexOfFirst { it.id == excludedImageFromDb.id }
+                if (index != -1) {
+                    updatedList[index] = updatedList[index].copy(isExcluded = true)
+                }
+            }
+
+            // 4. 用最终处理好的列表，一次性地、原子性地更新 StateFlow
+            _images.value = updatedList
+
+            // 5. 注册内容观察者
             registerContentObserverIfNeeded()
             registerVideoContentObserverIfNeeded()
         }
