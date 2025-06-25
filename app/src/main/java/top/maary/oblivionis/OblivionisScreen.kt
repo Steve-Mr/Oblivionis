@@ -70,7 +70,7 @@ fun OblivionisApp(
     NavHost(
         popExitTransition = {
             scaleOut(
-                targetScale = 0.8f,
+                targetScale = 0.9f,
                 transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f)
             )
         },
