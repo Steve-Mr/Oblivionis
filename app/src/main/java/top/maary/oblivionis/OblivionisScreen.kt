@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,7 +37,7 @@ import top.maary.oblivionis.ui.screen.WelcomeScreen
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import top.maary.oblivionis.viewmodel.NotificationViewModel
 
-enum class OblivionisScreen() { Welcome, Entry, Action, Recycle, Settings }
+enum class OblivionisScreen { Welcome, Entry, Action, Recycle, Settings }
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
@@ -69,88 +71,61 @@ fun OblivionisApp(
     }
 
     NavHost(
-        popExitTransition = {
-            scaleOut(
-                targetScale = 0.8f,
-                transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 0.5f)
-            )
-        },
-        popEnterTransition = {
-            EnterTransition.None
-        },
         navController = navController,
-        startDestination =
-            if (runBlocking { dataStore.permissionGranted.first() }) {
-                Log.v("OBLIVIONIS", "GO TO ENTRY")
-
-                OblivionisScreen.Entry.name
-            }
-            else OblivionisScreen.Welcome.name,
-    ){
-        composable (route = OblivionisScreen.Welcome.name) {
+        startDestination = if (permissionGranted) OblivionisScreen.Entry.name else OblivionisScreen.Welcome.name,
+        // 为 NavHost 设置全局的进入和退出动画
+        enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
+        exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) },
+        popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
+        popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
+    ) {
+        composable(route = OblivionisScreen.Welcome.name) {
             Log.v("OBLIVIONIS", "PERMISSION 2")
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 8.dp
-            ) {
-                WelcomeScreen (onPermissionFinished = {
-                    if (isReWelcome.value) return@WelcomeScreen
-                    welcomePermissionBasicLogic()
-                } , onFabClicked = {
-                    welcomePermissionBasicLogic()
-                })
-            }
+
+            WelcomeScreen(onPermissionFinished = {
+                if (isReWelcome.value) return@WelcomeScreen
+                welcomePermissionBasicLogic()
+            }, onFabClicked = {
+                welcomePermissionBasicLogic()
+            })
+
         }
-        composable (route = OblivionisScreen.Entry.name) {
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 8.dp
-            ) {
-                EntryScreen(
-                    viewModel = actionViewModel,
-                    onAlbumClick = {
-                        actionViewModel.loadImages()
-                        navController.navigate(OblivionisScreen.Action.name) },
-                    onSettingsClick = { navController.navigate(OblivionisScreen.Settings.name) }
-                )
-            }
+        composable(route = OblivionisScreen.Entry.name) {
+            EntryScreen(
+                viewModel = actionViewModel,
+                onAlbumClick = {
+                    actionViewModel.loadImages()
+                    navController.navigate(OblivionisScreen.Action.name)
+                },
+                onSettingsClick = { navController.navigate(OblivionisScreen.Settings.name) }
+            )
+
         }
-        composable (route = OblivionisScreen.Action.name) {
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 8.dp
-            ) {
-                ActionScreen (
-                    viewModel = actionViewModel,
-                    onNextButtonClicked = { navController.navigate(OblivionisScreen.Recycle.name)},
-                    onBackButtonClicked = { navController.popBackStack() })
-            }
+        composable(route = OblivionisScreen.Action.name) {
+            ActionScreen(
+                viewModel = actionViewModel,
+                onNextButtonClicked = { navController.navigate(OblivionisScreen.Recycle.name) },
+                onBackButtonClicked = { navController.popBackStack() })
+
         }
-        composable (route = OblivionisScreen.Recycle.name) {
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 8.dp
-            ) {
-                RecycleScreen(
-                    actionViewModel = actionViewModel,
-                    notificationViewModel = notificationViewModel,
-                    onBackButtonClicked = {navController.popBackStack()})
-            }
+        composable(route = OblivionisScreen.Recycle.name) {
+            RecycleScreen(
+                actionViewModel = actionViewModel,
+                notificationViewModel = notificationViewModel,
+                onBackButtonClicked = { navController.popBackStack() })
+
         }
-        composable (route = OblivionisScreen.Settings.name) {
-            Surface(
-                shadowElevation = 8.dp,
-                tonalElevation = 8.dp
-            ) {
-                SettingsScreen(
-                    onReWelcomeClick = {
-                        scope.launch { dataStore.setReWelcome(true) }
-                        welcomeScreenNextDest.value = OblivionisScreen.Settings.name
-                        navController.navigate(OblivionisScreen.Welcome.name) },
-                    onBackButtonClicked = { navController.popBackStack() },
-                    notificationViewModel = notificationViewModel
-                )
-            }
+        composable(route = OblivionisScreen.Settings.name) {
+            SettingsScreen(
+                onReWelcomeClick = {
+                    scope.launch { dataStore.setReWelcome(true) }
+                    welcomeScreenNextDest.value = OblivionisScreen.Settings.name
+                    navController.navigate(OblivionisScreen.Welcome.name)
+                },
+                onBackButtonClicked = { navController.popBackStack() },
+                notificationViewModel = notificationViewModel
+            )
+
         }
     }
 }
