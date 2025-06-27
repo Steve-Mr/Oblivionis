@@ -77,6 +77,7 @@ class ActionViewModel(
      */
     fun loadImages() {
         viewModelScope.launch {
+            _images.value = emptyList()
             // 1. 从 MediaStore 查询图片
             val imageList = queryImages()
 
