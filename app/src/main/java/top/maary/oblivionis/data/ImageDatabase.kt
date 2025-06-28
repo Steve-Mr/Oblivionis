@@ -6,8 +6,16 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [MediaStoreImage::class], version = 2, exportSchema = true,
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE images ADD COLUMN album TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+@Database(entities = [MediaStoreImage::class], version = 3, exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)]
 )
 @TypeConverters(Converters::class)
@@ -24,7 +32,7 @@ abstract class ImageDatabase: RoomDatabase(){
                     context.applicationContext,
                     ImageDatabase::class.java,
                     "images_database"
-                ).build()
+                ).addMigrations(MIGRATION_2_3).build()
                 INSTANCE = instance
                 instance
             }

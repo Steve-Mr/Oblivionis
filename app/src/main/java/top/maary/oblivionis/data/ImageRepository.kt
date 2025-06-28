@@ -5,8 +5,6 @@ import kotlinx.coroutines.flow.Flow
 
 
 class ImageRepository(private val imageDao: ImageDao) {
-    val allMarks: Flow<List<MediaStoreImage>>? = imageDao.getAllMarks()
-    val allExcludes: Flow<List<MediaStoreImage>>? = imageDao.getAllExcludes()
 
     @WorkerThread
     suspend fun mark(image: MediaStoreImage) {
@@ -26,8 +24,16 @@ class ImageRepository(private val imageDao: ImageDao) {
         imageDao.removeAll()
     }
 
-    suspend fun getLastMarked(): MediaStoreImage {
-        return imageDao.getLastMarked()
+    suspend fun getLastMarkedInAlbum(album: String): MediaStoreImage {
+        return imageDao.getLastMarkedInAlbum(album)
+    }
+
+    fun getMarkedInAlbum(album: String): Flow<List<MediaStoreImage>>? {
+        return imageDao.getMarkedInAlbum(album)
+    }
+
+    fun getExcludedInAlbum(album: String): Flow<List<MediaStoreImage>>? {
+        return imageDao.getExcludedInAlbum(album)
     }
 
     suspend fun removeId(id: Long) {

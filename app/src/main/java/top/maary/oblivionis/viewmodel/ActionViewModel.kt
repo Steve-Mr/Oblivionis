@@ -24,8 +24,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.forEach
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,7 +59,9 @@ class ActionViewModel(
     var albumPath: String? = null
 
     private val _lastMarked = MutableStateFlow<List<MediaStoreImage?>>(emptyList())
-    val lastMarked = _lastMarked.asStateFlow()
+    val lastMarked: Flow<List<MediaStoreImage?>> = _lastMarked.map { images ->
+        images.filter { it?.album == albumPath }
+    }
 
     private var contentObserver: ContentObserver? = null
     private var videoContentObserver: ContentObserver? = null
@@ -82,8 +86,8 @@ class ActionViewModel(
             val imageList = queryImages()
 
             // 2. 从数据库获取已标记和已排除的图片信息
-            val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
+            val databaseMarks = imageRepository.getMarkedInAlbum(albumPath!!)?.firstOrNull()
+            val databaseExclusions = imageRepository.getExcludedInAlbum(albumPath!!)?.firstOrNull()
 
             // 3. 创建一个可变列表，用于在内存中应用状态更新
             val updatedList = imageList.toMutableList()
@@ -158,13 +162,11 @@ class ActionViewModel(
         loadImages()
         loadAlbums()
         viewModelScope.launch {
-            val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
+            val databaseMarks = imageRepository.getMarkedInAlbum(albumPath!!)?.firstOrNull()
+            val databaseExclusions = imageRepository.getExcludedInAlbum(albumPath!!)?.firstOrNull()
             restoreData(databaseMarks, databaseExclusions)
         }
     }
-
-
 
     private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> get() = _albums
@@ -456,7 +458,7 @@ class ActionViewModel(
                             id
                         )
 
-                        val image = MediaStoreImage(id, displayName, dateModified, contentUri)
+                        val image = MediaStoreImage(id, displayName, albumPath!!,dateModified, contentUri)
 
                         images += image
                     }

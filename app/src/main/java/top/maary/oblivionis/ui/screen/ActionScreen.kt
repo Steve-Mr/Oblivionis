@@ -93,7 +93,7 @@ fun ActionScreen(
         }
     }
 
-    val lastMarkedCount = viewModel.lastMarked.collectAsState().value.size
+    val lastMarkedCount = viewModel.lastMarked.collectAsState(initial = emptyList()).value.size
     val showRestore by remember(lastMarkedCount) {
         derivedStateOf { lastMarkedCount > 0 }
     }
