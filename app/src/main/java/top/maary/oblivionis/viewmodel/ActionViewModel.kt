@@ -24,11 +24,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.forEach
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -43,25 +40,32 @@ import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
+data class ActionUiState(
+    val allImages: List<MediaStoreImage> = emptyList(), // 单一数据源
+    val allLastMarked: List<MediaStoreImage?> = emptyList(),
+    val albumTitle: String = "",
+    val isLoading: Boolean = true,
+) {
+    // 将 unmarkedImages 和 markedImages 作为计算属性
+    val unmarkedImages: List<MediaStoreImage>
+        get() = allImages.filter { !it.isMarked }
+
+    val markedImages: List<MediaStoreImage>
+        get() = allImages.filter { it.isMarked }
+
+    val lastMarked: List<MediaStoreImage?>
+        get() = allLastMarked.filter {it?.album == allImages.firstOrNull()?.album}
+}
+
 class ActionViewModel(
     application: Application,
     private val imageRepository: ImageRepository
 ) : AndroidViewModel(application) {
-    private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
 
-    val markedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
-        images.filter { it.isMarked }
-    }
-    val unmarkedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
-        images.filter { !it.isMarked }
-    }
+    private val _uiState = MutableStateFlow(ActionUiState())
+    val uiState: StateFlow<ActionUiState> = _uiState.asStateFlow()
 
     var albumPath: String? = null
-
-    private val _lastMarked = MutableStateFlow<List<MediaStoreImage?>>(emptyList())
-    val lastMarked: Flow<List<MediaStoreImage?>> = _lastMarked.map { images ->
-        images.filter { it?.album == albumPath }
-    }
 
     private var contentObserver: ContentObserver? = null
     private var videoContentObserver: ContentObserver? = null
@@ -69,7 +73,6 @@ class ActionViewModel(
 
     private var pendingDeleteImage: MediaStoreImage? = null
     private val _permissionNeededForDelete = MutableLiveData<IntentSender?>()
-    val permissionNeededForDelete: LiveData<IntentSender?> = _permissionNeededForDelete
 
     private val _pendingDeleteIntentSender = MutableStateFlow<IntentSender?>(null)
     val pendingDeleteIntentSender: Flow<IntentSender?> = _pendingDeleteIntentSender
@@ -82,37 +85,26 @@ class ActionViewModel(
     fun loadImages(album: String) {
         viewModelScope.launch {
             // 设置 albumPath
+            _uiState.update { it.copy(isLoading = true, albumTitle = album.substringAfterLast("/")) }
             albumPath = album
-            _images.value = emptyList()
-            // 1. 从 MediaStore 查询图片
-            val imageList = queryImages()
 
-            // 2. 从数据库获取已标记和已排除的图片信息
-            val databaseMarks = imageRepository.getMarkedInAlbum(albumPath!!)?.firstOrNull()
-            val databaseExclusions = imageRepository.getExcludedInAlbum(albumPath!!)?.firstOrNull()
+            val allImages = queryImages() // 从 MediaStore 加载
+            val markedFromDb = imageRepository.getMarkedInAlbum(album)?.firstOrNull() ?: emptyList()
+            val excludedFromDb = imageRepository.getExcludedInAlbum(album)?.firstOrNull() ?: emptyList()
 
-            // 3. 创建一个可变列表，用于在内存中应用状态更新
-            val updatedList = imageList.toMutableList()
+            val finalAllImages = allImages.map { image ->
+                image.copy(
+                    isMarked = markedFromDb.any { it.id == image.id },
+                    isExcluded = excludedFromDb.any { it.id == image.id }
+                )
+            }.sortedByDescending { it.dateAdded } // 确保初始加载时是排序好的
 
-            // 应用标记状态
-            databaseMarks?.forEach { markedImageFromDb ->
-                val index = updatedList.indexOfFirst { it.id == markedImageFromDb.id }
-                if (index != -1) {
-                    updatedList[index] = updatedList[index].copy(isMarked = true)
-                }
+            _uiState.update {
+                it.copy(
+                    allImages = finalAllImages,
+                    isLoading = false
+                )
             }
-
-            // 应用排除状态
-            databaseExclusions?.forEach { excludedImageFromDb ->
-                val index = updatedList.indexOfFirst { it.id == excludedImageFromDb.id }
-                if (index != -1) {
-                    updatedList[index] = updatedList[index].copy(isExcluded = true)
-                }
-            }
-
-            // 4. 用最终处理好的列表，一次性地、原子性地更新 StateFlow
-            _images.value = updatedList
-
             // 5. 注册内容观察者
             registerContentObserverIfNeeded()
             registerVideoContentObserverIfNeeded()
@@ -233,14 +225,6 @@ class ActionViewModel(
         return albumMap.values.toList()
     }
 
-    fun deleteImages(images: List<MediaStoreImage>) {
-        viewModelScope.launch {
-            performDeleteImageList(images)
-            clearImages()
-            loadAlbums()
-        }
-    }
-
     private fun deleteImage(image: MediaStoreImage) {
         viewModelScope.launch {
             performDeleteImage(image)
@@ -283,129 +267,144 @@ class ActionViewModel(
 
     fun markImage(index: Int) {
 
-        val unmarkedImageList = _images.value.filter {
-            !it.isMarked
-        }
+        val target = _uiState.value.unmarkedImages.getOrNull(index) ?: return
 
-        // 获取要标记的图片
-        val target = unmarkedImageList[index]
-        _lastMarked.value += target.copy(isMarked = true)
         databaseMark(target.copy(isMarked = true))
 
-        // 复制原始图片列表并找到要标记的图片的索引
-        val updatedList = _images.value.toMutableList()
-        val newIndex = updatedList.indexOf(target)
+        _uiState.update { currentState ->
+            val newAllImages = currentState.allImages.map {
+                if (it.id == target.id) {
+                    it.copy(isMarked = true)
+                } else {
+                    it
+                }
+            }
+            val newLastMarked = currentState.allLastMarked.toMutableList().apply { add(target.copy(isMarked = true)) }
 
-        // 确保找到图片并且不为空
-        if (newIndex != -1) {
-            // 标记图片
-            updatedList[newIndex] = target.copy(isMarked = true)
-
-            // 更新 _images 列表，Flow 会自动更新
-            _images.value = updatedList
+            currentState.copy(
+                allImages = newAllImages,
+                allLastMarked = newLastMarked
+            )
         }
     }
 
     fun excludeMedia(index: Int) {
-        val unmarkedImageList = _images.value.filter {
-            !it.isMarked
-        }
+
+        val target = _uiState.value.unmarkedImages.getOrNull(index) ?: return
 
         // 获取要标记的图片
-        val target = unmarkedImageList[index]
         databaseMark(target.copy(isExcluded = true))
 
-        // 复制原始图片列表并找到要标记的图片的索引
-        val updatedList = _images.value.toMutableList()
-        val newIndex = updatedList.indexOf(target)
-
-        // 确保找到图片并且不为空
-        if (newIndex != -1) {
-            // 标记图片
-            updatedList[newIndex] = target.copy(isExcluded = true)
-
-            // 更新 _images 列表，Flow 会自动更新
-            _images.value = updatedList
+        _uiState.update { currentState ->
+            // 创建一个新的未标记图片列表，更改目标图片的 isExcluded 状态
+            val newAllImages = currentState.allImages.map {
+                if (it.id == target.id) {
+                    it.copy(isExcluded = true)
+                } else {
+                    it
+                }
+            }
+            currentState.copy(
+                allImages = newAllImages,
+            )
         }
     }
-
     fun unMarkLastImage(): Long? {
         // 创建一个更新后的 _images 列表
-        val img = _lastMarked.value.lastOrNull() ?: return null
+        val img = _uiState.value.allLastMarked.lastOrNull() ?: return null
+        databaseUnmark(img)
 
-        val updatedList = _images.value.toMutableList()
+        _uiState.update { currentState ->
+            val newAllImages = currentState.allImages.map {
+                if (it.id == img.id) it.copy(isMarked = false) else it
+            }
+            val newLastMarked = currentState.allLastMarked.dropLast(1)
 
-        // 找到 lastMarkedImage 的索引
-        val index = updatedList.indexOf(img)
-
-        // 确保图片在列表中存在
-        if (index != -1) {
-            // 更新 isMarked 状态为 false
-            updatedList[index] = img.copy(isMarked = false)
-            databaseUnmark(img)
-
-            // 更新 _images 的值
-            _images.value = updatedList
-
-            // 清空 lastMarkedImage
-            _lastMarked.value = _lastMarked.value.dropLast(1)
-
-            // 返回图片的 id
-            return img.id
+            currentState.copy(
+                allImages = newAllImages,
+                allLastMarked = newLastMarked
+            )
         }
-
-        return null
-
+        return img.id
     }
 
     fun unMarkImage(target: MediaStoreImage) {
-        val updatedList = _images.value.toMutableList()
-        val index = updatedList.indexOf(target.copy(isMarked = true))
-        if (index == -1) return
-        updatedList[index] = target.copy(isMarked = false)
-        databaseUnmark(target.copy(isMarked = true))
-        _lastMarked.value = _lastMarked.value.filterNot { it == target }
-        _images.value = updatedList
+        _uiState.update { currentState ->
+            databaseUnmark(target.copy(isMarked = true))
+            val newAllImages = currentState.allImages.map {
+                if (it.id == target.id) {
+                    it.copy(isMarked = false)
+                } else {
+                    it
+                }
+            }
+            currentState.copy(allImages = newAllImages)
+        }
     }
 
     fun includeMedia(target: MediaStoreImage) {
-        val updatedList = _images.value.toMutableList()
-        val index = updatedList.indexOf(target.copy(isExcluded = true))
-        if (index == -1) return
-        updatedList[index] = target.copy(isExcluded = false)
         databaseUnmark(target.copy(isExcluded = true))
-        _images.value = updatedList
+        _uiState.update { currentState ->
+            val newAllImages = currentState.allImages.map {
+                if (it.id == target.id) {
+                    it.copy(isExcluded = false)
+                } else {
+                    it
+                }
+            }
+            currentState.copy(allImages = newAllImages)
+        }
     }
 
     private fun clearImages() {
-        _images.update { currentList ->
-            currentList.filter { !it.isMarked }
+        _uiState.update { currentState ->
+            databaseRemoveAll(currentState.markedImages) // Remove all marked images from DB
+            val newAllImages = currentState.allImages.map {
+                if (it.isMarked) {
+                    it.copy(isMarked = false)
+                } else {
+                    it
+                }
+            }
+            currentState.copy(
+                allImages = newAllImages,
+                allLastMarked = emptyList()
+            )
         }
-        _lastMarked.value = emptyList()
-        databaseRemoveAll()
     }
-
     private fun restoreMarkList(listToMark: List<MediaStoreImage>) {
-        val updatedList = _images.value.toMutableList()
-
-        listToMark.forEach { item ->
-            val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
-            if (index == -1) return@forEach
-            updatedList[index] = item.copy(isMarked = true)
+        _uiState.update { currentState ->
+            val newAllImages = currentState.allImages.map { image ->
+                if (listToMark.any { markedItem -> markedItem.id == image.id }) {
+                    image.copy(isMarked = true)
+                } else {
+                    image
+                }
+            }
+            currentState.copy(allImages = newAllImages)
         }
-        _images.value = updatedList
-
     }
 
     private fun restoreExcluded(list: List<MediaStoreImage>) {
-        val updatedList = _images.value.toMutableList()
-
-        list.forEach { item ->
-            val index = updatedList.indexOf(item.copy(isExcluded = false))
-            if (index == -1) return@forEach
-            updatedList[index] = item.copy(isExcluded = true)
+        _uiState.update { currentState ->
+            val newAllImages = currentState.allImages.map { image ->
+                if (list.any { excludedItem -> excludedItem.id == image.id }) {
+                    image.copy(isExcluded = true)
+                } else {
+                    image
+                }
+            }
+            // Ensure that items in listToMark are also updated in newAllImages
+            // This handles cases where an item might be in both listToMark and list (restoreExcluded)
+            val finalAllImages = newAllImages.map { image ->
+                if (currentState.allLastMarked.any { it?.id == image.id }) { // Assuming lastMarked holds items that should be marked
+                    image.copy(isMarked = true)
+                } else {
+                    image
+                }
+            }
+            currentState.copy(allImages = finalAllImages)
         }
-        _images.value = updatedList
     }
 
     private suspend fun queryImages(): List<MediaStoreImage> {
@@ -550,28 +549,25 @@ class ActionViewModel(
         }
     }
 
-    private fun databaseRemoveAll() = databaseUnmarkAll(_images.value)
-
-    fun removeId(id: Long) = viewModelScope.launch {
-        imageRepository.removeId(id)
-    }
-
+    private fun databaseRemoveAll(images: List<MediaStoreImage>) = databaseUnmarkAll(images)
     fun markAllImages() {
-        databaseMarkAll(images = _images.value)
-        _images.update { currentList ->
-            currentList.map {
-                if (!it.isExcluded) it.copy(isMarked = true)
-                else it
-            }
-        }
-    }
+        _uiState.update { currentState ->
+            val allImagesToMark = currentState.unmarkedImages.filterNot { it.isExcluded }
+            databaseMarkAll(images = allImagesToMark) // Database operation
 
-    fun unMarkAll() {
-        databaseUnmarkAll(_images.value)
-        _images.update { currentList ->
-            currentList.map { it.copy(isMarked = false) }
+            // Update the allImages list in the UI state
+            val newAllImages = currentState.allImages.map { image ->
+                if (allImagesToMark.any { it.id == image.id }) {
+                    image.copy(isMarked = true)
+                } else {
+                    image
+                }
+            }
+
+            currentState.copy(
+                allImages = newAllImages
+            )
         }
-        _lastMarked.value = emptyList()
     }
 
     private fun databaseUnmarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {

@@ -58,6 +58,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
 import coil3.video.VideoFrameDecoder
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.map
 import top.maary.oblivionis.R
 import top.maary.oblivionis.ui.ActionRow
 import top.maary.oblivionis.ui.Dialog
@@ -74,11 +75,11 @@ fun ActionScreen(
     onBackButtonClicked: () -> Unit,
 ) {
 
-    val images = viewModel.unmarkedImages.collectAsState(initial = emptyList())
+    val images = viewModel.uiState.map { it.unmarkedImages }.collectAsState(initial = emptyList())
 
-    val marked = viewModel.markedImages.collectAsState(initial = emptyList())
+    val marked = viewModel.uiState.map { it.markedImages }.collectAsState(initial = emptyList())
 
-    val markedCount = viewModel.markedImages.collectAsState(initial = emptyList()).value.size
+    val markedCount = marked.value.size
     val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
     val badgeDefaultsColor = BadgeDefaults.containerColor
 
@@ -93,7 +94,7 @@ fun ActionScreen(
         }
     }
 
-    val lastMarkedCount = viewModel.lastMarked.collectAsState(initial = emptyList()).value.size
+    val lastMarkedCount = viewModel.uiState.map { it.lastMarked }.collectAsState(initial = emptyList()).value.size
     val showRestore by remember(lastMarkedCount) {
         derivedStateOf { lastMarkedCount > 0 }
     }

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.video.VideoFrameDecoder
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import top.maary.oblivionis.R
@@ -62,7 +63,7 @@ fun RecycleScreen(
     val dataStore = PreferenceRepository(context)
     val scope = rememberCoroutineScope()
 
-    val images = actionViewModel.markedImages.collectAsState(initial = emptyList())
+    val images = actionViewModel.uiState.map { it.markedImages }.collectAsState(initial = emptyList())
 
     val intentSender = actionViewModel.pendingDeleteIntentSender.collectAsState(initial = null)
 
