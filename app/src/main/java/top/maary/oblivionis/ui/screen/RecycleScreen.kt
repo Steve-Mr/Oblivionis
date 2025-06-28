@@ -27,6 +27,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +64,9 @@ fun RecycleScreen(
     val dataStore = PreferenceRepository(context)
     val scope = rememberCoroutineScope()
 
-    val images = actionViewModel.uiState.map { it.markedImages }.collectAsState(initial = emptyList())
+    val uiState by actionViewModel.uiState.collectAsState()
+
+    val images = uiState.markedImages
 
     val intentSender = actionViewModel.pendingDeleteIntentSender.collectAsState(initial = null)
 
@@ -77,11 +80,11 @@ fun RecycleScreen(
     val deleteLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-
         // 处理结果
         if (result.resultCode == Activity.RESULT_OK) {
             // 删除成功后的逻辑
-            actionViewModel.deletePendingImage()
+//            actionViewModel.deletePendingImage()
+            actionViewModel.onDeletionCompleted()
         }
     }
 
@@ -126,7 +129,6 @@ fun RecycleScreen(
                             onConfirmation = {
                                 // 直接调用 ViewModel 的方法，移除 runBlocking 和 scope.launch
                                 actionViewModel.deleteMarkedImagesAndRescheduleNotification(
-                                    images.value,
                                     dataStore,
                                     notificationViewModel
                                 )
@@ -138,8 +140,8 @@ fun RecycleScreen(
                     if (selectedItems.value.isNotEmpty()) {
                         FilledTonalButton(
                             onClick = {
-                                if (selectedItems.value.size != images.value.size) {
-                                    selectedItems.value = images.value.indices.toMutableSet()
+                                if (selectedItems.value.size != images.size) {
+                                    selectedItems.value = images.indices.toMutableSet()
                                 }else{
                                     selectedItems.value = mutableSetOf()
                                 } },
@@ -149,7 +151,7 @@ fun RecycleScreen(
                         }
                     } else {
                         FilledTonalButton(
-                            enabled = images.value.isNotEmpty(),
+                            enabled = images.isNotEmpty(),
                             onClick = { openDialog.value = true },
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
@@ -171,7 +173,7 @@ fun RecycleScreen(
                             onDismissRequest = { openDialog.value = false },
                             onConfirmation = {
                                 selectedItems.value.forEach { index ->
-                                    actionViewModel.unMarkImage(images.value[index])
+                                    actionViewModel.unMarkImage(images[index])
                                 }
                                 selectedItems.value = mutableSetOf()
                                 openDialog.value = false
@@ -195,7 +197,7 @@ fun RecycleScreen(
 
         val clickedIndex = remember { mutableIntStateOf(-1) }
 
-        if (images.value.isEmpty()) {
+        if (images.isEmpty()) {
             PlaceHolder(modifier = Modifier, stringResource = R.string.nothing_to_do)
             return@Scaffold
         }
@@ -208,13 +210,13 @@ fun RecycleScreen(
                         Modifier.height(innerPadding.calculateTopPadding())
                     )
                 }
-                items(images.value.size) { index ->
+                items(images.size) { index ->
 
                     if (openDialog.value) {
                         Dialog(
                             onDismissRequest = { openDialog.value = false },
                             onConfirmation = {
-                                actionViewModel.unMarkImage(images.value[clickedIndex.intValue])
+                                actionViewModel.unMarkImage(images[clickedIndex.intValue])
                                 clickedIndex.intValue = -1
                                 openDialog.value = false
                             },
@@ -226,7 +228,7 @@ fun RecycleScreen(
                         modifier = Modifier
                             .padding(2.dp)
                             .background(Color.Transparent),
-                        uri = images.value[index].contentUri,
+                        uri = images[index].contentUri,
                         isMultiSelectionState = selectedItems.value.isNotEmpty(),
                         isSelected = selectedItems.value.contains(index),
                         imageLoader = imageLoader,

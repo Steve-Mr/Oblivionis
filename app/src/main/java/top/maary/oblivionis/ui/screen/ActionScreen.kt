@@ -23,11 +23,14 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -45,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key.Companion.Sleep
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -67,7 +72,7 @@ import top.maary.oblivionis.ui.PlaceHolder
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import kotlin.math.absoluteValue
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ActionScreen(
     viewModel: ActionViewModel = viewModel(),
@@ -75,18 +80,16 @@ fun ActionScreen(
     onBackButtonClicked: () -> Unit,
 ) {
 
-    val images = viewModel.uiState.map { it.unmarkedImages }.collectAsState(initial = emptyList())
+    val uiState by viewModel.uiState.collectAsState()
+    val unmarkedImages = uiState.unmarkedImages
+    val markedImages = uiState.markedImages
 
-    val marked = viewModel.uiState.map { it.markedImages }.collectAsState(initial = emptyList())
-
-    val markedCount = marked.value.size
     val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
     val badgeDefaultsColor = BadgeDefaults.containerColor
 
-    val badgeColor by remember(markedCount, secondaryContainerColor, badgeDefaultsColor) {
+    val badgeColor by remember(markedImages.size, secondaryContainerColor, badgeDefaultsColor) {
         derivedStateOf {
-            // 2. 在 derivedStateOf 中使用已经获取到的颜色值
-            if (markedCount == 0) {
+            if (markedImages.isEmpty()) {
                 secondaryContainerColor
             } else {
                 badgeDefaultsColor
@@ -94,12 +97,11 @@ fun ActionScreen(
         }
     }
 
-    val lastMarkedCount = viewModel.uiState.map { it.lastMarked }.collectAsState(initial = emptyList()).value.size
-    val showRestore by remember(lastMarkedCount) {
-        derivedStateOf { lastMarkedCount > 0 }
+    val showRestore by remember(uiState.lastMarkedImage) {
+        derivedStateOf { uiState.lastMarkedImage != null }
     }
 
-    val pagerState = rememberPagerState(pageCount = { images.value.size })
+    val pagerState = rememberPagerState(pageCount = { unmarkedImages.size })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -137,7 +139,7 @@ fun ActionScreen(
                             contentDescription = stringResource(id = R.string.back)
                         )
                         Text(
-                            text = viewModel.albumPath.toString().substringAfterLast("/"),
+                            text = uiState.albumTitle,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -145,9 +147,9 @@ fun ActionScreen(
                 },
                 actions = {
                     BadgedBox(modifier = Modifier.padding(end = 8.dp),
-                        badge = { Badge(containerColor = badgeColor) { Text(text = marked.value.size.toString()) } }) {
+                        badge = { Badge(containerColor = badgeColor) { Text(text = markedImages.size.toString()) } }) {
                         FilledTonalButton(
-                            onClick = { onNextButtonClicked() }, enabled = marked.value.isNotEmpty()
+                            onClick = { onNextButtonClicked() }, enabled = markedImages.isNotEmpty()
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_recycle),
@@ -170,10 +172,11 @@ fun ActionScreen(
             }
             ActionRow(
                 modifier = Modifier.navigationBarsPadding(),
-                delButtonClickable = images.value.isNotEmpty(),
+                delButtonClickable = unmarkedImages.isNotEmpty(),
                 onDelButtonClicked = {
-                    if (images.value.isNotEmpty()) {
-                        viewModel.markImage(pagerState.currentPage)
+                    if (unmarkedImages.isNotEmpty()) {
+                        val imageToMark = unmarkedImages[pagerState.currentPage]
+                        viewModel.markImage(imageToMark)
                     }
                 },
                 onDelButtonLongClicked = {
@@ -183,7 +186,7 @@ fun ActionScreen(
                     viewModel.unMarkLastImage()
                 },
                 onShareButtonClicked = {
-                    val uri = images.value[pagerState.currentPage].contentUri
+                    val uri = unmarkedImages[pagerState.currentPage].contentUri
                     val sendIntent: Intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         putExtra(Intent.EXTRA_STREAM, uri)
@@ -196,13 +199,20 @@ fun ActionScreen(
                 },
                 showRestore = showRestore,
                 currentPage = pagerState.currentPage +1,
-                pagesCount = images.value.size
+                pagesCount = unmarkedImages.size
             )
         }
 
     ) { innerPadding ->
 
-        if (images.value.isEmpty()) {
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+            return@Scaffold
+        }
+
+        if (unmarkedImages.isEmpty()) {
             PlaceHolder(
                 modifier = Modifier, stringResource = R.string.congratulations
             )
@@ -221,6 +231,12 @@ fun ActionScreen(
             verticalAlignment = Alignment.CenterVertically,
             pageSpacing = 16.dp
         ) { page ->
+            val currentImage = unmarkedImages[page]
+
+            LaunchedEffect(currentImage.id) {
+                dragOffset = 0f
+                swipeScale = 1f
+            }
 
             Box(modifier = Modifier
                 .fillMaxSize()
@@ -285,29 +301,20 @@ fun ActionScreen(
                                     swipeScale = (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
                                 }
 
-
-                                if (images.value[pagerState.currentPage].isExcluded) {
+                                if (currentImage.isExcluded) {
                                     openExcludeDialog.value = true
                                 } else {
-
-                                    dragOffset = 0f
-                                    swipeScale = 1f
-
-                                    if (images.value.isNotEmpty()) {
-                                        val index = pagerState.currentPage
-                                        // if (pagerState.currentPage > 0) {
-                                        //     index -= 1
-                                        // }
-                                        viewModel.markImage(index)
-                                    }
+//                                    dragOffset = 0f
+//                                    swipeScale = 1f
+                                    viewModel.markImage(currentImage)
                                 }
                             }
                         } else {
                             if (dragOffset == 100f) {
-                                if (images.value[pagerState.currentPage].isExcluded) {
-                                    viewModel.includeMedia(images.value[pagerState.currentPage])
+                                if (currentImage.isExcluded) {
+                                    viewModel.includeMedia(currentImage)
                                 } else {
-                                    viewModel.excludeMedia(pagerState.currentPage)
+                                    viewModel.excludeMedia(currentImage)
                                 }
                             }
                             // Reset position and scale
@@ -326,13 +333,13 @@ fun ActionScreen(
                     }, onConfirmation = {
                         dragOffset = 0f
                         swipeScale = 1f
-                        viewModel.markImage(pagerState.currentPage)
+                        viewModel.markImage(currentImage)
                         openExcludeDialog.value = false
                     }, dialogText = stringResource(R.string.delete_excluded)
                     )
                 }
 
-                val uri = images.value[page].contentUri
+                val uri = unmarkedImages[page].contentUri
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     data = uri
                 }
@@ -350,7 +357,7 @@ fun ActionScreen(
                             )
                         }
                     )
-                    if (images.value[page].isExcluded) {
+                    if (unmarkedImages[page].isExcluded) {
                         IconButton(
                             onClick = {}, colors = IconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,

@@ -1,42 +1,163 @@
 package top.maary.oblivionis.data
 
+import android.annotation.SuppressLint
+import android.content.ContentResolver
+import android.content.ContentUris
+import android.os.Looper
+import android.provider.MediaStore
+import android.util.Log
 import androidx.annotation.WorkerThread
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.withContext
+import java.util.Date
+import java.util.concurrent.TimeUnit
 
+/**
+ * 重构后的 ImageRepository.
+ *
+ * 职责:
+ * 1. 作为图片数据的唯一真实来源 (Single Source of Truth).
+ * 2. 封装所有与图片相关的业务逻辑，包括从 MediaStore 加载和从 Room 数据库读写.
+ * 3. 向 ViewModel 提供数据流 (Flows of data).
+ *
+ * @param imageDao Room 数据库的访问接口.
+ * @param contentResolver 用于查询 MediaStore.
+ */
+class ImageRepository(
+    private val imageDao: ImageDao,
+    private val contentResolver: ContentResolver
+) {
 
-class ImageRepository(private val imageDao: ImageDao) {
+    /**
+     * 获取指定相册的图片流。
+     * 这个 Flow 会结合 MediaStore 的数据和 Room 中标记/排除的数据。
+     * 当数据库变化时，Flow 会自动发出最新的数据列表。
+     * @param albumPath 要加载的相册路径.
+     */
+    fun getImagesStream(albumPath: String): Flow<List<MediaStoreImage>> {
 
+        // 1. 创建一个 ContentObserver Flow 作为“触发器”
+        //    它会在外部文件系统变化时发出一个信号。
+        val contentObserverFlow = callbackFlow {
+            val observer = object : android.database.ContentObserver(android.os.Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    trySend(Unit) // 文件变化时，发送一个信号
+                }
+            }
+            // 注册观察者
+            val urisToObserve = listOf(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            )
+            urisToObserve.forEach { uri ->
+                contentResolver.registerContentObserver(uri, true, observer)
+            }
+
+            // 当 Flow 被取消时，注销观察者
+            awaitClose {
+                contentResolver.unregisterContentObserver(observer)
+            }
+        }.onStart { emit(Unit) } // onStart 会在 Flow 第一次被收集时立即发送一个初始信号，用于加载初始数据
+
+        // 2. 结合触发器来驱动 MediaStore 查询
+        //    每当 contentObserverFlow 发出信号，我们都重新查询 MediaStore
+        val imagesFromMediaFlow = contentObserverFlow.map {
+            queryImagesFromMediaStore(albumPath)
+        }.distinctUntilChanged() // 如果查询结果没有变化，则不发射，避免不必要的重组
+
+        Log.v("IMAGE_REPO", "getImagesStream: Querying images from MediaStore for album: $albumPath")
+
+        // 3. 从 Room 获取标记和排除的图片流 (这部分逻辑不变)
+        val markedImagesFlow: Flow<List<MediaStoreImage>> = imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+        val excludedImagesFlow: Flow<List<MediaStoreImage>> = imageDao.getExcludedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+
+        // 4. 将所有数据源合并，生成最终的 UI 状态
+        return combine(imagesFromMediaFlow, markedImagesFlow, excludedImagesFlow) { mediaImages, markedImages, excludedImages ->
+            mediaImages.map { mediaImage ->
+                mediaImage.copy(
+                    isMarked = markedImages.any { it.id == mediaImage.id },
+                    isExcluded = excludedImages.any { it.id == mediaImage.id }
+                )
+            }.sortedByDescending { it.dateAdded }
+        }.flowOn(Dispatchers.IO) // 确保所有操作都在 IO 线程
+    }
+
+    /**
+     * 标记一张图片 (包括标记为待删除或排除).
+     * @param image 要标记的图片.
+     */
     @WorkerThread
     suspend fun mark(image: MediaStoreImage) {
-        imageDao.mark(image)
+        withContext(Dispatchers.IO) {
+            imageDao.mark(image)
+        }
     }
 
+    /**
+     * 取消标记一张图片 (包括恢复或取消排除).
+     * @param image 要取消标记的图片.
+     */
+    @WorkerThread
     suspend fun unmark(image: MediaStoreImage) {
-        if (image.isMarked and image.isExcluded) {
-            imageDao.updateIsMarked(image.id, false)
-            return
+        withContext(Dispatchers.IO) {
+            // 如果图片同时是 marked 和 excluded，unmark 只应该移除 marked 状态
+            if (image.isMarked && image.isExcluded) {
+                imageDao.updateIsMarked(image.id, false)
+            } else {
+                imageDao.unmark(image)
+            }
+        }
+    }
+
+    /**
+     * 从 MediaStore 查询指定相册的所有图片和视频.
+     */
+    @SuppressLint("Recycle")
+    private fun queryImagesFromMediaStore(albumPath: String): List<MediaStoreImage> {
+        val images = mutableListOf<MediaStoreImage>()
+        val uriList = listOf(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        )
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.DATE_ADDED
+        )
+        val selection = "${MediaStore.Images.ImageColumns.RELATIVE_PATH} like ?"
+        val selectionArgs = arrayOf("$albumPath/")
+        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+        for (uri in uriList) {
+            contentResolver.query(
+                uri, projection, selection, selectionArgs, sortOrder
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
+                    val displayName = cursor.getString(displayNameColumn)
+                    val contentUri = ContentUris.withAppendedId(uri, id)
+                    val image = MediaStoreImage(id, displayName, albumPath, dateAdded, contentUri)
+                    images += image
+                }
+            }
         }
 
-        imageDao.unmark(image)
-    }
+        Log.v("IMAGE_REPO_QUERY", "getImagesStream: Querying images from MediaStore for album: $albumPath")
 
-    suspend fun removeAll() {
-        imageDao.removeAll()
-    }
-
-    suspend fun getLastMarkedInAlbum(album: String): MediaStoreImage {
-        return imageDao.getLastMarkedInAlbum(album)
-    }
-
-    fun getMarkedInAlbum(album: String): Flow<List<MediaStoreImage>>? {
-        return imageDao.getMarkedInAlbum(album)
-    }
-
-    fun getExcludedInAlbum(album: String): Flow<List<MediaStoreImage>>? {
-        return imageDao.getExcludedInAlbum(album)
-    }
-
-    suspend fun removeId(id: Long) {
-        imageDao.removeId(id)
+        return images
     }
 }

@@ -23,7 +23,6 @@ interface ImageDao {
     @Query("SELECT * FROM images WHERE album = :album AND is_marked = true")
     fun getMarkedInAlbum(album: String): Flow<List<MediaStoreImage>>?
 
-
     @Query("SELECT * FROM images WHERE album = :album AND is_excluded = true")
     fun getExcludedInAlbum(album: String): Flow<List<MediaStoreImage>>?
 
