@@ -66,7 +66,7 @@ fun RecycleScreen(
 
     val uiState by actionViewModel.uiState.collectAsState()
 
-    val images = uiState.markedImages
+    val images by actionViewModel.markedImagesFlow.collectAsState(initial = emptyList())
 
     val intentSender = actionViewModel.pendingDeleteIntentSender.collectAsState(initial = null)
 
@@ -83,7 +83,6 @@ fun RecycleScreen(
         // 处理结果
         if (result.resultCode == Activity.RESULT_OK) {
             // 删除成功后的逻辑
-//            actionViewModel.deletePendingImage()
             actionViewModel.onDeletionCompleted()
         }
     }

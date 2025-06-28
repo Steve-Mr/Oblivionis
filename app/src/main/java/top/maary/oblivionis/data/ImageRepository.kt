@@ -7,6 +7,9 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.WorkerThread
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -33,9 +36,80 @@ import java.util.concurrent.TimeUnit
  * @param contentResolver 用于查询 MediaStore.
  */
 class ImageRepository(
-    private val imageDao: ImageDao,
+    private val database: ImageDatabase,
     private val contentResolver: ContentResolver
 ) {
+    private val imageDao = database.imageDao()
+
+    fun getImagePagingData(albumPath: String): Flow<PagingData<MediaStoreImage>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 20, // 每次加载20个
+                enablePlaceholders = false
+            ),
+            pagingSourceFactory = {
+                MediaStorePagingSource(contentResolver, database, albumPath)
+            }
+        ).flow
+    }
+
+    /**
+     * RecycleScreen 仍然需要一个非分页的标记列表。
+     */
+    fun getMarkedImagesStream(albumPath: String): Flow<List<MediaStoreImage>> {
+        return imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+    }
+
+    /**
+     * 标记指定相册中的所有图片。
+     * @param albumPath 要批量标记的相册路径。
+     */
+    suspend fun markAllInAlbum(albumPath: String) {
+        withContext(Dispatchers.IO) {
+            // 1. 从 MediaStore 查询出该相册的所有图片信息
+            val allImagesInAlbum = queryImagesFromMediaStore(albumPath)
+
+            // 2. 准备要插入/更新到数据库的实体列表
+            //    过滤掉已经被排除的图片，其他的全部设置为 isMarked = true
+            val imagesToMark = allImagesInAlbum
+                .filterNot { it.isExcluded } // 假设我们不标记已排除的
+                .map { it.copy(isMarked = true) }
+
+            // 3. 调用 DAO 进行批量插入/替换操作
+            if (imagesToMark.isNotEmpty()) {
+                imageDao.markAll(imagesToMark)
+            }
+        }
+    }
+
+    /**
+     * 获取指定相册中的媒体总数。
+     * 这是一个轻量级操作，只用于显示计数。
+     * @param albumPath 要查询的相册路径。
+     */
+    suspend fun getAlbumTotalCount(albumPath: String): Int {
+        return withContext(Dispatchers.IO) {
+            var count = 0
+            val collection = MediaStore.Files.getContentUri("external")
+            val projection = arrayOf(MediaStore.Files.FileColumns._ID) // 只需要查询 ID 列即可
+            val selection = """
+                (${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?)
+                AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} like ?
+            """.trimIndent()
+            val selectionArgs = arrayOf(
+                MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
+                "$albumPath/"
+            )
+
+            // 对于只获取总数，我们不需要 Bundle 查询，一个简单的 query 即可
+            contentResolver.query(collection, projection, selection, selectionArgs, null)
+                ?.use { cursor ->
+                    count = cursor.count
+                }
+            count
+        }
+    }
 
     /**
      * 获取指定相册的图片流。
@@ -121,7 +195,6 @@ class ImageRepository(
     /**
      * 从 MediaStore 查询指定相册的所有图片和视频.
      */
-    @SuppressLint("Recycle")
     private fun queryImagesFromMediaStore(albumPath: String): List<MediaStoreImage> {
         val images = mutableListOf<MediaStoreImage>()
         val uriList = listOf(
@@ -138,26 +211,22 @@ class ImageRepository(
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
         for (uri in uriList) {
-            contentResolver.query(
-                uri, projection, selection, selectionArgs, sortOrder
-            )?.use { cursor ->
-                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-                val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+            contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)
+                ?.use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                    val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idColumn)
-                    val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
-                    val displayName = cursor.getString(displayNameColumn)
-                    val contentUri = ContentUris.withAppendedId(uri, id)
-                    val image = MediaStoreImage(id, displayName, albumPath, dateAdded, contentUri)
-                    images += image
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idColumn)
+                        val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
+                        val displayName = cursor.getString(displayNameColumn)
+                        val contentUri = ContentUris.withAppendedId(uri, id)
+                        val image = MediaStoreImage(id, displayName, albumPath, dateAdded, contentUri)
+                        images += image
+                    }
                 }
-            }
         }
-
-        Log.v("IMAGE_REPO_QUERY", "getImagesStream: Querying images from MediaStore for album: $albumPath")
-
         return images
     }
 }

@@ -18,7 +18,7 @@ import top.maary.oblivionis.data.PreferenceRepository
 class OblivionisApplication: Application() {
 
     private val database by lazy { ImageDatabase.getDataBase(this) }
-    val repository by lazy { ImageRepository(database.imageDao(), applicationContext.contentResolver) }
+    val repository by lazy { ImageRepository(database, applicationContext.contentResolver) }
     // 将 preferenceRepository 也作为 Application 的属性，方便访问
     private val preferenceRepository by lazy { PreferenceRepository(this) }
 

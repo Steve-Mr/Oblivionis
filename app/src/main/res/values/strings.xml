@@ -51,4 +51,5 @@
     <string name="d1">1 Day</string>
     <string name="notification_perission_description">Allow Oblivionis push notifications. Related feature still needs to be enabled in the settings.</string>
     <string name="pager_count" translatable="false">%1$d / %2$d</string>
+    <string name="error_loading">Loading Error</string>
 </resources>
