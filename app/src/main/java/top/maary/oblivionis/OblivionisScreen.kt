@@ -80,7 +80,6 @@ fun OblivionisApp(
         popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
     ) {
         composable(route = OblivionisScreen.Welcome.name) {
-            Log.v("OBLIVIONIS", "PERMISSION 2")
 
             WelcomeScreen(onPermissionFinished = {
                 if (isReWelcome.value) return@WelcomeScreen
@@ -94,7 +93,7 @@ fun OblivionisApp(
             EntryScreen(
                 viewModel = actionViewModel,
                 onAlbumClick = {
-                    actionViewModel.loadImages()
+                    actionViewModel.loadImages(it)
                     navController.navigate(OblivionisScreen.Action.name)
                 },
                 onSettingsClick = { navController.navigate(OblivionisScreen.Settings.name) }

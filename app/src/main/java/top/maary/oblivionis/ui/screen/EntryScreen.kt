@@ -42,7 +42,7 @@ import top.maary.oblivionis.viewmodel.ActionViewModel
 @Composable
 fun EntryScreen(
     viewModel: ActionViewModel = viewModel(),
-    onAlbumClick: () -> Unit,
+    onAlbumClick: (String) -> Unit,
     onSettingsClick: () -> Unit
 ) {
 
@@ -97,8 +97,7 @@ fun EntryScreen(
 
             items(albums.value) { album ->
                 EntryItem(name = album.name, num = album.mediaCount, onClick = {
-                    viewModel.albumPath = album.path
-                    onAlbumClick()
+                    onAlbumClick(album.path)
                 })
             }
             item {

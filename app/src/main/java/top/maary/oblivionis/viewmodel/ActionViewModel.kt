@@ -79,8 +79,10 @@ class ActionViewModel(
      * Performs a one shot load of images from [MediaStore.Images.Media.EXTERNAL_CONTENT_URI] into
      * the [_images] [LiveData] above.
      */
-    fun loadImages() {
+    fun loadImages(album: String) {
         viewModelScope.launch {
+            // 设置 albumPath
+            albumPath = album
             _images.value = emptyList()
             // 1. 从 MediaStore 查询图片
             val imageList = queryImages()
@@ -159,7 +161,7 @@ class ActionViewModel(
     }
 
     private fun reloadContent() {
-        loadImages()
+        loadImages(albumPath ?: return)
         loadAlbums()
         viewModelScope.launch {
             val databaseMarks = imageRepository.getMarkedInAlbum(albumPath!!)?.firstOrNull()
