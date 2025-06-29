@@ -3,6 +3,8 @@ package top.maary.oblivionis.data
 import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.ContentUris
+import android.database.ContentObserver
+import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
@@ -53,11 +55,36 @@ class ImageRepository(
         ).flow
     }
 
+    fun getMarkedImagePagingData(albumPath: String): Flow<PagingData<MediaStoreImage>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 30, // 回收站每页可以加载更多，比如30个
+                enablePlaceholders = false
+            ),
+            // 使用我们新创建的 PagingSource
+            pagingSourceFactory = { MarkedItemsPagingSource(database, albumPath) }
+        ).flow
+    }
+
+    suspend fun unmarkAllInAlbum(albumPath: String, excludeIds: Set<Long>) {
+        withContext(Dispatchers.IO) {
+            imageDao.unmarkAllInAlbum(albumPath, excludeIds)
+        }
+    }
+
+    fun getMarkedCountStream(albumPath: String): Flow<Int> {
+        return imageDao.getMarkedCountStream(albumPath)
+    }
+
     /**
      * RecycleScreen 仍然需要一个非分页的标记列表。
      */
     fun getMarkedImagesStream(albumPath: String): Flow<List<MediaStoreImage>> {
         return imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+    }
+
+    suspend fun getMarkedInAlbumOnce(albumPath: String): List<MediaStoreImage> {
+        return imageDao.getMarkedInAlbumOnce(albumPath)
     }
 
     /**
@@ -83,12 +110,59 @@ class ImageRepository(
     }
 
     /**
+     * 响应式地获取指定相册中的媒体总数。
+     * 这个 Flow 由 ContentObserver 驱动，当外部存储变化时会自动发出新的计数值。
+     * @param albumPath 要查询的相册路径。
+     */
+    fun getAlbumTotalCountStream(albumPath: String): Flow<Int> = callbackFlow {
+        // 1. 定义 ContentObserver
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                // 当媒体库变化时，重新查询总数并发送
+                trySend(getAlbumTotalCount(albumPath))
+            }
+        }
+
+        // 2. 注册观察者
+        contentResolver.registerContentObserver(
+            MediaStore.Files.getContentUri("external"),
+            true,
+            observer
+        )
+
+        // 3. 在 Flow 第一次被收集时，立即发送一个初始值
+        trySend(getAlbumTotalCount(albumPath))
+
+        // 4. 当 Flow 关闭时，注销观察者
+        awaitClose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+
+    /**
+     * 【新增】调用 DAO 来通过ID列表删除数据库记录。
+     */
+    suspend fun deleteImagesByIds(ids: Set<Long>) {
+        withContext(Dispatchers.IO) {
+            imageDao.deleteImagesByIds(ids)
+        }
+    }
+
+    /**
+     * 【补充】调用 DAO 来通过ID列表获取图片对象。
+     */
+    suspend fun getImagesByIds(ids: Set<Long>): List<MediaStoreImage> {
+        return withContext(Dispatchers.IO) {
+            imageDao.getImagesByIds(ids)
+        }
+    }
+
+    /**
      * 获取指定相册中的媒体总数。
      * 这是一个轻量级操作，只用于显示计数。
      * @param albumPath 要查询的相册路径。
      */
-    suspend fun getAlbumTotalCount(albumPath: String): Int {
-        return withContext(Dispatchers.IO) {
+    private fun getAlbumTotalCount(albumPath: String): Int {
             var count = 0
             val collection = MediaStore.Files.getContentUri("external")
             val projection = arrayOf(MediaStore.Files.FileColumns._ID) // 只需要查询 ID 列即可
@@ -107,8 +181,7 @@ class ImageRepository(
                 ?.use { cursor ->
                     count = cursor.count
                 }
-            count
-        }
+            return count
     }
 
     /**

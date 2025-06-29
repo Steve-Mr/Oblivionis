@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -48,13 +49,15 @@ class ActionViewModel(
     private val _uiState = MutableStateFlow(ActionUiState())
     val uiState: StateFlow<ActionUiState> = _uiState.asStateFlow()
 
-    // 这个Flow现在专门为RecycleScreen服务，因为它需要一个完整的、非分页的列表
-    lateinit var markedImagesFlow: Flow<List<MediaStoreImage>>
-        private set
-
     // 新增：持有PagingData流的属性，这是ActionScreen的主要数据源
     var imagePagingDataFlow: Flow<PagingData<MediaStoreImage>> = emptyFlow()
         private set
+
+    // 这个Flow现在专门为RecycleScreen服务，因为它需要一个完整的、非分页的列表
+    var markedImagePagingDataFlow: Flow<PagingData<MediaStoreImage>> = emptyFlow()
+        private set
+
+    private var imagesPendingDeletion: List<MediaStoreImage>? = null
 
     // --- 业务逻辑状态 ---
     private val undoManager = UndoManager()
@@ -90,7 +93,8 @@ class ActionViewModel(
     }
 
     private var countJob: Job? = null
-
+    private var markedCountJob: Job? = null
+    private var aggregateDataJob: Job? = null
     /**
      * 为指定的相册加载图片数据。
      * 这个方法会初始化两个数据流：一个用于ActionScreen的分页流，一个用于RecycleScreen的完整标记列表流。
@@ -105,19 +109,49 @@ class ActionViewModel(
                 albumTitle = albumPath.substringAfterLast("/"),
                 totalImageCount = 0) }
 
-        // 2. 为RecycleScreen准备数据流
-        markedImagesFlow = imageRepository.getMarkedImagesStream(albumPath)
-
         // 3. 创建并缓存PagingData流，供ActionScreen使用
         imagePagingDataFlow = imageRepository.getImagePagingData(albumPath)
             .cachedIn(viewModelScope) // 关键！缓存数据以支持屏幕旋转等场景
 
-        countJob?.cancel()
+        markedImagePagingDataFlow = imageRepository.getMarkedImagePagingData(albumPath)
+            .cachedIn(viewModelScope) // 同样进行缓存
 
-        countJob = viewModelScope.launch {
-            val totalCount = imageRepository.getAlbumTotalCount(albumPath)
-            // 获取到总数后，更新 UI 状态
-            _uiState.update { it.copy(totalImageCount = totalCount) }
+//        countJob?.cancel()
+//        countJob = imageRepository.getAlbumTotalCountStream(albumPath)
+//            .onEach { count ->
+//                _uiState.update { it.copy(totalImageCount = count) }
+//            }
+//            .launchIn(viewModelScope)
+//
+//        markedCountJob?.cancel() // 取消上一个相册的监听
+//        markedCountJob = imageRepository.getMarkedCountStream(albumPath)
+//            .onEach { count ->
+//                // 每当计数值变化时，更新 UI State
+//                _uiState.update { it.copy(markedImageCount = count) }
+//            }
+//            .launchIn(viewModelScope)
+
+        aggregateDataJob?.cancel()
+        aggregateDataJob = viewModelScope.launch {
+            // 1. 定义两个上游数据流
+            val totalCountFlow = imageRepository.getAlbumTotalCountStream(albumPath)
+            val markedCountFlow = imageRepository.getMarkedCountStream(albumPath)
+
+            // 2. 使用 combine 将它们合并
+            combine(totalCountFlow, markedCountFlow) { totalCount, markedCount ->
+                // 3. 在 combine 块内部，计算出所有需要的状态值
+                val displayableCount = totalCount - markedCount
+                // 4. 将计算结果包装成一个 Pair 或自定义数据类，以便一次性发送
+                Pair(markedCount, displayableCount)
+            }.onEach { (markedCount, displayableCount) ->
+                // 5. 在最终的收集器中，用一次 update 更新所有相关的UI状态
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        markedImageCount = markedCount,
+                        displayableImageCount = displayableCount
+                    )
+                }
+            }.launchIn(this) // 在当前协程作用域内启动
         }
     }
 
@@ -145,10 +179,19 @@ class ActionViewModel(
             imageRepository.markAllInAlbum(albumToMark)
 
             // 3. 这是一个不可撤销的大规模操作，因此需要清空当前相册的“撤销”历史。
-            undoManager.clearHistoryForCurrentAlbum()
+            undoManager.clearHistoryForCurrentAlbum(albumToMark)
 
             // 4. 更新UI状态，清除 lastMarkedImage，让“撤销”按钮消失。
             _uiState.update { it.copy(lastMarkedImage = null) }
+        }
+    }
+
+    fun unmarkAllImages(excludeIds: Set<Long>) {
+        val albumToUnmark = currentAlbumPath ?: return
+        viewModelScope.launch {
+            imageRepository.unmarkAllInAlbum(albumToUnmark, excludeIds)
+            // 这是一个大规模恢复操作，也应该清空当前相册的“撤销”历史
+            undoManager.clearHistoryForCurrentAlbum(albumToUnmark)
         }
     }
 
@@ -189,15 +232,20 @@ class ActionViewModel(
         dataStore: PreferenceRepository,
         notificationViewModel: NotificationViewModel
     ) {
+        // 1. 确保我们知道当前是哪个相册
+        val albumToDeleteFrom = currentAlbumPath ?: return
+
         viewModelScope.launch {
-            // 从专用的数据流中获取当前的标记列表
-            val imagesToDelete = markedImagesFlow.first()
+            // 2. 调用专用的 Repository 方法，一次性获取所有待删除的图片
+            val imagesToDelete = imageRepository.getMarkedInAlbumOnce(albumToDeleteFrom)
             if (imagesToDelete.isEmpty()) return@launch
 
-            // 执行删除
+            imagesPendingDeletion = imagesToDelete
+
+            // 3. 执行删除（这部分逻辑不变）
             performDeleteImageList(imagesToDelete)
 
-            // 检查是否需要重新调度通知
+            // 4. 检查并重新调度通知（这部分逻辑不变）
             if (!dataStore.intervalStartFixed.first()) {
                 val calendar = Calendar.getInstance()
                 val notificationTime = dataStore.notificationTime.first()
@@ -214,12 +262,25 @@ class ActionViewModel(
     }
 
     fun onDeletionCompleted() {
-        // 由于无法直接从PagingData获取列表，我们在删除后不直接操作状态，
-        // 而是依赖PagingSource的刷新机制。
-        // 主要任务是清理待处理的删除请求和更新相册计数。
+        // 1. 获取刚刚被删除的图片列表
+        val deletedImages = imagesPendingDeletion ?: return
+        if (deletedImages.isEmpty()) return
+
         viewModelScope.launch {
+            // 2. 从 Room 数据库中移除这些图片的记录
+            imageRepository.deleteImagesByIds(deletedImages.map { it.id }.toSet())
+
+            // 3. 清理暂存的列表和待处理的删除请求
+            imagesPendingDeletion = null
             _pendingDeleteIntentSender.value = null
-            loadAlbums() // 重新加载相册以更新计数
+
+            // 4. 重新加载相册列表以更新计数
+            loadAlbums()
+
+            // 5. 这是一个大规模操作，也应该清空当前相册的“撤销”历史
+            deletedImages.firstOrNull()?.album?.let { albumPath ->
+                undoManager.clearHistoryForCurrentAlbum(albumPath)
+            }
         }
     }
 
