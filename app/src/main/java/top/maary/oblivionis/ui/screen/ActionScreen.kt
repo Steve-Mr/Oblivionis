@@ -89,9 +89,13 @@ fun ActionScreen(
     val lazyPagingItems: LazyPagingItems<MediaStoreImage> =
         viewModel.imagePagingDataFlow.collectAsLazyPagingItems()
 
+    LaunchedEffect(lazyPagingItems.itemCount) {
+        Log.e("PAGING_DEBUG", "UI Received PagingData update. Item count: ${lazyPagingItems.itemCount}")
+    }
+
     val uiState by viewModel.uiState.collectAsState()
 
-    val markedImages by viewModel.markedImagesFlow.collectAsState(initial = emptyList())
+//    val markedImages by viewModel.markedImagesFlow.collectAsState(initial = emptyList())
 
     val visuallyRemovedItems = remember { mutableStateOf(setOf<Long>()) }
 
@@ -99,14 +103,18 @@ fun ActionScreen(
         if (lazyPagingItems.loadState.refresh is LoadState.NotLoading) {
             visuallyRemovedItems.value = setOf()
         }
+        if (lazyPagingItems.loadState.refresh is LoadState.Error) {
+            val error = (lazyPagingItems.loadState.refresh as LoadState.Error).error
+            Log.e("PAGING_DEBUG", "ActionScreen caught Paging LoadState.Error:", error)
+        }
     }
 
     val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
     val badgeDefaultsColor = BadgeDefaults.containerColor
 
-    val badgeColor by remember(markedImages.size, secondaryContainerColor, badgeDefaultsColor) {
+    val badgeColor by remember(uiState.markedImageCount, secondaryContainerColor, badgeDefaultsColor) {
         derivedStateOf {
-            if (markedImages.isEmpty()) {
+            if (uiState.markedImageCount == 0) {
                 secondaryContainerColor
             } else {
                 badgeDefaultsColor
@@ -164,9 +172,9 @@ fun ActionScreen(
                 },
                 actions = {
                     BadgedBox(modifier = Modifier.padding(end = 8.dp),
-                        badge = { Badge(containerColor = badgeColor) { Text(text = markedImages.size.toString()) } }) {
+                        badge = { Badge(containerColor = badgeColor) { Text(text = uiState.markedImageCount.toString()) } }) {
                         FilledTonalButton(
-                            onClick = { onNextButtonClicked() }, enabled = markedImages.isNotEmpty()
+                            onClick = { onNextButtonClicked() }, enabled = uiState.markedImageCount > 0
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_recycle),
@@ -223,7 +231,7 @@ fun ActionScreen(
                 },
                 showRestore = showRestore,
                 currentPage = if (lazyPagingItems.itemCount > 0) pagerState.currentPage + 1 else 0,
-                pagesCount = uiState.totalImageCount
+                pagesCount = uiState.displayableImageCount
             )
         }
 
@@ -259,7 +267,9 @@ fun ActionScreen(
             contentPadding = PaddingValues(horizontal = 64.dp),
             verticalAlignment = Alignment.CenterVertically,
             pageSpacing = 16.dp,
-            key = lazyPagingItems.itemKey { it.id }, // 提供稳定的Key
+            key = lazyPagingItems.itemKey {
+                Log.v("PAGING_DEBUG", "HorizontalPager generating UI for key: ${it.id}")
+                it.id }, // 提供稳定的Key
         ) { page ->
             val currentImage = lazyPagingItems[page] ?: return@HorizontalPager
 

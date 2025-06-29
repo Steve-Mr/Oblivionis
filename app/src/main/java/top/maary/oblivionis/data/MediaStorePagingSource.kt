@@ -24,8 +24,12 @@ class MediaStorePagingSource(
 
     private val imageDao = database.imageDao()
 
+    private var markedIdsSnapshot: Set<Long>? = null
+    private var excludedIdsSnapshot: Set<Long>? = null
+
     private val observer = object : InvalidationTracker.Observer(arrayOf("images")) {
         override fun onInvalidated(tables: Set<String>) {
+            Log.d("PAGING_DEBUG", "mediaObserver triggered. Invalidating PagingSource for album: $albumPath")
             invalidate()
         }
     }
@@ -39,11 +43,13 @@ class MediaStorePagingSource(
     }
 
     init {
+        Log.d("PAGING_DEBUG", "PagingSource CREATED for album: '$albumPath'")
         // 在 PagingSource 初始化时，注册观察者
         database.invalidationTracker.addObserver(observer)
         contentResolver.registerContentObserver(MediaStore.Files.getContentUri("external"), true, mediaObserver)
         // 当 PagingSource 失效时（无论是手动还是自动），确保注销观察者，防止内存泄漏
         registerInvalidatedCallback {
+            Log.d("PAGING_DEBUG", "PagingSource INVALIDATED for album: '$albumPath'")
             database.invalidationTracker.removeObserver(observer)
             contentResolver.unregisterContentObserver(mediaObserver)
         }
@@ -60,24 +66,37 @@ class MediaStorePagingSource(
         return try {
             val page = params.key ?: 0
             val offset = page * params.loadSize
+            Log.i("PAGING_DEBUG", "--> load() called: page=$page, offset=$offset, loadSize=${params.loadSize}")
+
+            if (markedIdsSnapshot == null || excludedIdsSnapshot == null) {
+                markedIdsSnapshot = imageDao.getMarkedIdsInAlbum(albumPath).toSet()
+                excludedIdsSnapshot = imageDao.getExcludedIdsInAlbum(albumPath).toSet()
+            }
+
+            val currentMarkedIds = markedIdsSnapshot!!
+            val currentExcludedIds = excludedIdsSnapshot!!
 
             val media = withContext(Dispatchers.IO) {
                 queryMediaStore(limit = params.loadSize, offset = offset)
             }
+            Log.i("PAGING_DEBUG", "queryMediaStore returned ${media.size} items.")
 
-            val markedIds = imageDao.getMarkedIdsInAlbum(albumPath)
-            val excludedIds = imageDao.getExcludedIdsInAlbum(albumPath)
+//            val markedIds = imageDao.getMarkedIdsInAlbum(albumPath)
+//            val excludedIds = imageDao.getExcludedIdsInAlbum(albumPath)
 
             val processedMedia = media
-                .filterNot { markedIds.contains(it.id) }
-                .map { it.copy(isExcluded = excludedIds.contains(it.id)) }
+                .filterNot { currentMarkedIds.contains(it.id) }
+                .map { it.copy(isExcluded = currentExcludedIds.contains(it.id)) }
+
+            Log.i("PAGING_DEBUG", "<-- load() FINISHED. Returning ${processedMedia.size} items. IDs: ${processedMedia.map { it.id }}")
 
             LoadResult.Page(
                 data = processedMedia,
                 prevKey = if (page == 0) null else page - 1,
-                nextKey = if (media.isEmpty()) null else page + 1
+                nextKey = if (media.size < params.loadSize) null else page + 1
             )
         } catch (e: Exception) {
+            Log.e("PAGING_DEBUG", "Error during load()", e)
             LoadResult.Error(e)
         }
     }

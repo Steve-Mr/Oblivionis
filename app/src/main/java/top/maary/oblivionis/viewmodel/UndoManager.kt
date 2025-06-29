@@ -64,9 +64,9 @@ class UndoManager {
     /**
      * 当执行“全部标记”这种不可撤销的操作时调用。
      */
-    fun clearHistoryForCurrentAlbum() {
-        currentAlbumPath?.let {
-            stacksByAlbum.remove(it)
+    fun clearHistoryForCurrentAlbum(albumPath: String) {
+        stacksByAlbum.remove(albumPath)
+        if (this.currentAlbumPath == albumPath) {
             _lastMarkedImage.value = null
         }
     }
