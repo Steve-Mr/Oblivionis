@@ -2,265 +2,222 @@ package top.maary.oblivionis.viewmodel
 
 import android.app.Application
 import android.app.RecoverableSecurityException
-import android.content.ContentResolver
-import android.content.ContentUris
 import android.content.IntentSender
-import android.database.ContentObserver
-import android.database.Cursor
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import top.maary.oblivionis.OblivionisApplication
 import top.maary.oblivionis.data.Album
 import top.maary.oblivionis.data.ImageRepository
-import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.MediaEntity
 import top.maary.oblivionis.data.PreferenceRepository
-import java.io.File
+import top.maary.oblivionis.ui.ActionUiState
 import java.util.Calendar
-import java.util.Date
-import java.util.concurrent.TimeUnit
 
 class ActionViewModel(
     application: Application,
     private val imageRepository: ImageRepository
 ) : AndroidViewModel(application) {
-    private val _images = MutableStateFlow<List<MediaStoreImage>>(emptyList())
 
-    val markedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
-        images.filter { it.isMarked }
-    }
-    val unmarkedImages: Flow<List<MediaStoreImage>> = _images.map { images ->
-        images.filter { !it.isMarked }
-    }
+    // --- 状态管理 ---
+    private val _uiState = MutableStateFlow(ActionUiState())
+    val uiState: StateFlow<ActionUiState> = _uiState.asStateFlow()
 
-    var albumPath: String? = null
+    // 新增：持有PagingData流的属性，这是ActionScreen的主要数据源
+    var imagePagingDataFlow: Flow<PagingData<MediaEntity>> = emptyFlow()
+        private set
 
-    private val _lastMarked = MutableStateFlow<List<MediaStoreImage?>>(emptyList())
-    val lastMarked = _lastMarked.asStateFlow()
+    // 这个Flow现在专门为RecycleScreen服务，因为它需要一个完整的、非分页的列表
+    var markedImagePagingDataFlow: Flow<PagingData<MediaEntity>> = emptyFlow()
+        private set
 
-    private var contentObserver: ContentObserver? = null
-    private var videoContentObserver: ContentObserver? = null
+    private var imagesPendingDeletion: List<MediaEntity>? = null
 
+    // --- 业务逻辑状态 ---
+    private val undoManager = UndoManager()
 
-    private var pendingDeleteImage: MediaStoreImage? = null
+    val albums: StateFlow<List<Album>> = imageRepository.getAlbumListStream()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000), // 5秒后停止共享，节省资源
+            initialValue = emptyList() // 提供一个初始空列表
+        )
+
+    private var currentAlbumPath: String? = null
+
+    // --- 删除流程状态 ---
+    private var pendingDeleteImage: MediaEntity? = null
     private val _permissionNeededForDelete = MutableLiveData<IntentSender?>()
-    val permissionNeededForDelete: LiveData<IntentSender?> = _permissionNeededForDelete
-
     private val _pendingDeleteIntentSender = MutableStateFlow<IntentSender?>(null)
     val pendingDeleteIntentSender: Flow<IntentSender?> = _pendingDeleteIntentSender
 
-
+    init {
+        undoManager.lastMarkedImage
+            .onEach { newLastMarked ->
+                _uiState.update { it.copy(lastMarkedImage = newLastMarked) }
+            }
+            .launchIn(viewModelScope) // 在 viewModelScope 中启动这个监听
+    }
+    
+    private var aggregateDataJob: Job? = null
     /**
-     * Performs a one shot load of images from [MediaStore.Images.Media.EXTERNAL_CONTENT_URI] into
-     * the [_images] [LiveData] above.
+     * 为指定的相册加载图片数据。
+     * 这个方法会初始化两个数据流：一个用于ActionScreen的分页流，一个用于RecycleScreen的完整标记列表流。
+     * @param albumPath 要加载的相册路径。
      */
-    fun loadImages() {
-        viewModelScope.launch {
-            // 1. 从 MediaStore 查询图片
-            val imageList = queryImages()
+    fun loadImages(albumPath: String) {
+        this.currentAlbumPath = albumPath
+        undoManager.syncStateForAlbum(albumPath)
+        // 1. 更新UI状态中的相册标题
+        _uiState.update {
+            it.copy(albumTitle = albumPath.substringAfterLast("/"))
+        }
 
-            // 2. 从数据库获取已标记和已排除的图片信息
-            val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
+        // 3. 创建并缓存PagingData流，供ActionScreen使用
+        imagePagingDataFlow = imageRepository.getImagePagingData(albumPath)
+            .cachedIn(viewModelScope) // 关键！缓存数据以支持屏幕旋转等场景
 
-            // 3. 创建一个可变列表，用于在内存中应用状态更新
-            val updatedList = imageList.toMutableList()
+        markedImagePagingDataFlow = imageRepository.getMarkedImagePagingData(albumPath)
+            .cachedIn(viewModelScope) // 同样进行缓存
 
-            // 应用标记状态
-            databaseMarks?.forEach { markedImageFromDb ->
-                val index = updatedList.indexOfFirst { it.id == markedImageFromDb.id }
-                if (index != -1) {
-                    updatedList[index] = updatedList[index].copy(isMarked = true)
+        aggregateDataJob?.cancel()
+        aggregateDataJob = viewModelScope.launch {
+            // 1. 定义两个上游数据流
+            val totalCountFlow = imageRepository.getAlbumTotalCountStream(albumPath)
+            val markedCountFlow = imageRepository.getMarkedCountStream(albumPath)
+
+            // 2. 使用 combine 将它们合并
+            combine(totalCountFlow, markedCountFlow) { totalCount, markedCount ->
+                // 3. 在 combine 块内部，计算出所有需要的状态值
+                val displayableCount = totalCount - markedCount
+                // 4. 将计算结果包装成一个 Pair 或自定义数据类，以便一次性发送
+                Pair(markedCount, displayableCount)
+            }.onEach { (markedCount, displayableCount) ->
+                // 5. 在最终的收集器中，用一次 update 更新所有相关的UI状态
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        markedImageCount = markedCount,
+                        displayableImageCount = displayableCount
+                    )
                 }
-            }
-
-            // 应用排除状态
-            databaseExclusions?.forEach { excludedImageFromDb ->
-                val index = updatedList.indexOfFirst { it.id == excludedImageFromDb.id }
-                if (index != -1) {
-                    updatedList[index] = updatedList[index].copy(isExcluded = true)
-                }
-            }
-
-            // 4. 用最终处理好的列表，一次性地、原子性地更新 StateFlow
-            _images.value = updatedList
-
-            // 5. 注册内容观察者
-            registerContentObserverIfNeeded()
-            registerVideoContentObserverIfNeeded()
+            }.launchIn(this) // 在当前协程作用域内启动
         }
     }
 
-    private fun restoreData(databaseMarks: List<MediaStoreImage>?, databaseExclusions: List<MediaStoreImage>?) {
-        databaseMarks?.let { restoreMarkList(it) }
-        databaseExclusions?.let { restoreExcluded(it) }
-    }
+    // --- 图片操作 ---
 
-    private fun registerContentObserverIfNeeded() {
-        if (contentObserver == null) {
-            contentObserver = getApplication<Application>().contentResolver.registerObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            ) {
-                reloadContentIfNeeded()
-            }
-        }
-    }
-
-    private fun registerVideoContentObserverIfNeeded() {
-        if (videoContentObserver == null) {
-            videoContentObserver = getApplication<Application>().contentResolver.registerObserver(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            ) {
-                reloadContentIfNeeded()
-            }
-        }
-    }
-
-    private val reloadMutex = Mutex()
-
-    private fun reloadContentIfNeeded() {
+    fun markImage(image: MediaEntity) {
         viewModelScope.launch {
-            // 尝试获取锁，如果已经被锁定，则直接返回
-            if (reloadMutex.tryLock()) {
-                try {
-                    reloadContent()
-                } finally {
-                    // 确保在任务完成后释放锁
-                    reloadMutex.unlock()
-                }
-            }
+            val imageToMark = image.copy(isMarked = true)
+            imageRepository.mark(imageToMark)
+
+            // 将标记的图片压入对应相册的“历史记录”栈
+            undoManager.push(imageToMark)
+
+            // 更新UI状态，让“撤销”按钮可以立即显示
+            _uiState.update { it.copy(lastMarkedImage = imageToMark) }
         }
     }
 
-    private fun reloadContent() {
-        loadImages()
-        loadAlbums()
+    fun markAllImages() {
+        // 1. 确保我们知道当前是哪个相册，如果不知道则不执行任何操作。
+        val albumToMark = currentAlbumPath ?: return
+
         viewModelScope.launch {
-            val databaseMarks = imageRepository.allMarks?.firstOrNull()
-            val databaseExclusions = imageRepository.allExcludes?.firstOrNull()
-            restoreData(databaseMarks, databaseExclusions)
+            // 2. 调用 Repository 的批量更新方法。
+            imageRepository.markAllInAlbum(albumToMark)
+
+            // 3. 这是一个不可撤销的大规模操作，因此需要清空当前相册的“撤销”历史。
+            undoManager.clearHistoryForCurrentAlbum(albumToMark)
+
+            // 4. 更新UI状态，清除 lastMarkedImage，让“撤销”按钮消失。
+            _uiState.update { it.copy(lastMarkedImage = null) }
         }
     }
 
-
-
-    private val _albums = MutableStateFlow<List<Album>>(emptyList())
-    val albums: StateFlow<List<Album>> get() = _albums
-
-    fun loadAlbums() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val albumList = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
-            _albums.value = albumList
-        }
-    }
-
-    // Function to fetch album names and paths from MediaStore for both images and videos
-    private fun getAlbumsFromMediaStore(contentResolver: ContentResolver): List<Album> {
-        val albumMap = mutableMapOf<String, Album>()
-
-        // Query both Images and Videos
-        val uriList = listOf(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // Images URI
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI   // Videos URI
-        )
-
-        val projection = arrayOf(
-            MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
-            MediaStore.Images.Media.DATA,
-        )
-
-        val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC"
-
-        for (uri in uriList) {
-            val cursor: Cursor? = contentResolver.query(
-                uri,
-                projection,
-                null,
-                null,
-                sortOrder
-            )
-
-            cursor?.use {
-                val nameColumn =
-                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-                val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(nameColumn) ?: ""
-                    val path = File(cursor.getString(pathColumn)).parent!!.replace(
-                        "/storage/emulated/0/",
-                        ""
-                    ).replace("/storage/emulated/0", "")
-                    // Check if this album (BUCKET_ID) is already in the map
-                    val album = albumMap[path]
-                    if (album == null) {
-                        // Add a new album with an initial count of 1
-                        albumMap[path] = Album(name, path, 1)
-                    } else {
-                        // Increment the media count for this album
-                        albumMap[path] = album.copy(mediaCount = album.mediaCount + 1)
-                    }
-                }
-            }
-        }
-
-        return albumMap.values.toList()
-    }
-
-    fun deleteImages(images: List<MediaStoreImage>) {
+    fun unmarkAllImages(excludeIds: Set<Long>) {
+        val albumToUnmark = currentAlbumPath ?: return
         viewModelScope.launch {
-            performDeleteImageList(images)
-            clearImages()
-            loadAlbums()
+            imageRepository.unmarkAllInAlbum(albumToUnmark, excludeIds)
+            // 这是一个大规模恢复操作，也应该清空当前相册的“撤销”历史
+            undoManager.clearHistoryForCurrentAlbum(albumToUnmark)
         }
     }
 
-    private fun deleteImage(image: MediaStoreImage) {
+    fun unMarkImage(target: MediaEntity) {
         viewModelScope.launch {
-            performDeleteImage(image)
+            // 直接调用 repository 的 unmark 方法，它会处理数据库的更新。
+            // 由于 markedImagesFlow 是一个响应式数据流，
+            // 数据库更新后，UI 会自动收到新的列表并刷新。
+            imageRepository.unmark(target)
         }
     }
 
-    fun deletePendingImage() {
-        pendingDeleteImage?.let { image ->
-            pendingDeleteImage = null
-            deleteImage(image)
+    fun unMarkLastImage() {
+        // 从 UndoManager 获取要撤销的图片
+        val imageToUnmark = undoManager.pop() ?: return
+
+        viewModelScope.launch {
+            // 用获取到的图片更新数据库
+            imageRepository.unmark(imageToUnmark)
         }
     }
+
+    fun excludeMedia(image: MediaEntity) {
+        viewModelScope.launch {
+            imageRepository.mark(image.copy(isExcluded = true))
+        }
+    }
+
+    fun includeMedia(image: MediaEntity) {
+        viewModelScope.launch {
+            imageRepository.unmark(image.copy(isExcluded = true))
+        }
+    }
+
+    // --- 删除逻辑 ---
 
     fun deleteMarkedImagesAndRescheduleNotification(
-        images: List<MediaStoreImage>,
         dataStore: PreferenceRepository,
         notificationViewModel: NotificationViewModel
     ) {
-        viewModelScope.launch {
-            // 先执行删除
-            performDeleteImageList(images)
-            clearImages()
-            loadAlbums()
+        // 1. 确保我们知道当前是哪个相册
+        val albumToDeleteFrom = currentAlbumPath ?: return
 
-            // 然后检查是否需要重新调度通知（这里是异步挂起，不会阻塞）
+        viewModelScope.launch {
+            // 2. 调用专用的 Repository 方法，一次性获取所有待删除的图片
+            val imagesToDelete = imageRepository.getMarkedInAlbumOnce(albumToDeleteFrom)
+            if (imagesToDelete.isEmpty()) return@launch
+
+            imagesPendingDeletion = imagesToDelete
+
+            // 3. 执行删除（这部分逻辑不变）
+            performDeleteImageList(imagesToDelete)
+
+            // 4. 检查并重新调度通知（这部分逻辑不变）
             if (!dataStore.intervalStartFixed.first()) {
                 val calendar = Calendar.getInstance()
                 val notificationTime = dataStore.notificationTime.first()
@@ -276,235 +233,39 @@ class ActionViewModel(
         }
     }
 
-    fun markImage(index: Int) {
+    fun onDeletionCompleted() {
+        // 1. 获取刚刚被删除的图片列表
+        val deletedImages = imagesPendingDeletion ?: return
+        if (deletedImages.isEmpty()) return
 
-        val unmarkedImageList = _images.value.filter {
-            !it.isMarked
-        }
+        viewModelScope.launch {
+            // 2. 从 Room 数据库中移除这些图片的记录
+            imageRepository.deleteImagesByIds(deletedImages.map { it.id }.toSet())
 
-        // 获取要标记的图片
-        val target = unmarkedImageList[index]
-        _lastMarked.value += target.copy(isMarked = true)
-        databaseMark(target.copy(isMarked = true))
+            // 3. 清理暂存的列表和待处理的删除请求
+            imagesPendingDeletion = null
+            _pendingDeleteIntentSender.value = null
 
-        // 复制原始图片列表并找到要标记的图片的索引
-        val updatedList = _images.value.toMutableList()
-        val newIndex = updatedList.indexOf(target)
-
-        // 确保找到图片并且不为空
-        if (newIndex != -1) {
-            // 标记图片
-            updatedList[newIndex] = target.copy(isMarked = true)
-
-            // 更新 _images 列表，Flow 会自动更新
-            _images.value = updatedList
-        }
-    }
-
-    fun excludeMedia(index: Int) {
-        val unmarkedImageList = _images.value.filter {
-            !it.isMarked
-        }
-
-        // 获取要标记的图片
-        val target = unmarkedImageList[index]
-        databaseMark(target.copy(isExcluded = true))
-
-        // 复制原始图片列表并找到要标记的图片的索引
-        val updatedList = _images.value.toMutableList()
-        val newIndex = updatedList.indexOf(target)
-
-        // 确保找到图片并且不为空
-        if (newIndex != -1) {
-            // 标记图片
-            updatedList[newIndex] = target.copy(isExcluded = true)
-
-            // 更新 _images 列表，Flow 会自动更新
-            _images.value = updatedList
-        }
-    }
-
-    fun unMarkLastImage(): Long? {
-        // 创建一个更新后的 _images 列表
-        val img = _lastMarked.value.lastOrNull() ?: return null
-
-        val updatedList = _images.value.toMutableList()
-
-        // 找到 lastMarkedImage 的索引
-        val index = updatedList.indexOf(img)
-
-        // 确保图片在列表中存在
-        if (index != -1) {
-            // 更新 isMarked 状态为 false
-            updatedList[index] = img.copy(isMarked = false)
-            databaseUnmark(img)
-
-            // 更新 _images 的值
-            _images.value = updatedList
-
-            // 清空 lastMarkedImage
-            _lastMarked.value = _lastMarked.value.dropLast(1)
-
-            // 返回图片的 id
-            return img.id
-        }
-
-        return null
-
-    }
-
-    fun unMarkImage(target: MediaStoreImage) {
-        val updatedList = _images.value.toMutableList()
-        val index = updatedList.indexOf(target.copy(isMarked = true))
-        if (index == -1) return
-        updatedList[index] = target.copy(isMarked = false)
-        databaseUnmark(target.copy(isMarked = true))
-        _lastMarked.value = _lastMarked.value.filterNot { it == target }
-        _images.value = updatedList
-    }
-
-    fun includeMedia(target: MediaStoreImage) {
-        val updatedList = _images.value.toMutableList()
-        val index = updatedList.indexOf(target.copy(isExcluded = true))
-        if (index == -1) return
-        updatedList[index] = target.copy(isExcluded = false)
-        databaseUnmark(target.copy(isExcluded = true))
-        _images.value = updatedList
-    }
-
-    private fun clearImages() {
-        _images.update { currentList ->
-            currentList.filter { !it.isMarked }
-        }
-        _lastMarked.value = emptyList()
-        databaseRemoveAll()
-    }
-
-    private fun restoreMarkList(listToMark: List<MediaStoreImage>) {
-        val updatedList = _images.value.toMutableList()
-
-        listToMark.forEach { item ->
-            val index = updatedList.indexOf(item.copy(isMarked = false, isExcluded = false))
-            if (index == -1) return@forEach
-            updatedList[index] = item.copy(isMarked = true)
-        }
-        _images.value = updatedList
-
-    }
-
-    private fun restoreExcluded(list: List<MediaStoreImage>) {
-        val updatedList = _images.value.toMutableList()
-
-        list.forEach { item ->
-            val index = updatedList.indexOf(item.copy(isExcluded = false))
-            if (index == -1) return@forEach
-            updatedList[index] = item.copy(isExcluded = true)
-        }
-        _images.value = updatedList
-    }
-
-    private suspend fun queryImages(): List<MediaStoreImage> {
-        val images = mutableListOf<MediaStoreImage>()
-
-        withContext(Dispatchers.IO) {
-
-            val uriList = listOf(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // Images URI
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI   // Videos URI
-            )
-
-            val projection = arrayOf(
-                MediaStore.Images.Media._ID,
-                MediaStore.Images.Media.DISPLAY_NAME,
-                MediaStore.Images.Media.DATE_ADDED
-            )
-
-            val selection = "${MediaStore.Images.ImageColumns.RELATIVE_PATH} like ?"
-
-            val selectionArgs = arrayOf(
-                "${albumPath}/"
-            )
-
-            val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-
-            for (uri in uriList) {
-                getApplication<Application>().contentResolver.query(
-                    uri,
-                    projection,
-                    selection,
-                    selectionArgs,
-                    sortOrder
-                )?.use { cursor ->
-
-                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                    val dateModifiedColumn =
-                        cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-                    val displayNameColumn =
-                        cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-
-                    while (cursor.moveToNext()) {
-
-                        // Here we'll use the column index that we found above.
-                        val id = cursor.getLong(idColumn)
-                        val dateModified =
-                            Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateModifiedColumn)))
-                        val displayName = cursor.getString(displayNameColumn)
-
-                        val contentUri = ContentUris.withAppendedId(
-                            uri,
-                            id
-                        )
-
-                        val image = MediaStoreImage(id, displayName, dateModified, contentUri)
-
-                        images += image
-                    }
-                }
+            // 5. 这是一个大规模操作，也应该清空当前相册的“撤销”历史
+            deletedImages.firstOrNull()?.album?.let { albumPath ->
+                undoManager.clearHistoryForCurrentAlbum(albumPath)
             }
         }
-
-        return images
     }
 
-    private suspend fun performDeleteImage(image: MediaStoreImage) {
-
+    private suspend fun performDeleteImageList(images: List<MediaEntity>) {
+        if (images.isEmpty()) return
         withContext(Dispatchers.IO) {
             try {
                 val deleteRequest = MediaStore.createDeleteRequest(
                     getApplication<Application>().contentResolver,
-                    arrayListOf(image.contentUri)
+                    images.map { it.contentUri }
                 )
                 _pendingDeleteIntentSender.value = deleteRequest.intentSender
             } catch (securityException: SecurityException) {
                 val recoverableSecurityException =
                     securityException as? RecoverableSecurityException
                         ?: throw securityException
-
-                // Signal to the Activity that it needs to request permission and
-                // try the delete again if it succeeds.
-                pendingDeleteImage = image
-                _permissionNeededForDelete.postValue(
-                    recoverableSecurityException.userAction.actionIntent.intentSender
-                )
-            }
-        }
-    }
-
-    private suspend fun performDeleteImageList(images: List<MediaStoreImage>) {
-
-        withContext(Dispatchers.IO) {
-            try {
-                val deleteRequest = MediaStore.createDeleteRequest(
-                    getApplication<Application>().contentResolver,
-                    images.map { it.contentUri })
-                _pendingDeleteIntentSender.value = deleteRequest.intentSender
-            } catch (securityException: SecurityException) {
-                val recoverableSecurityException =
-                    securityException as? RecoverableSecurityException
-                        ?: throw securityException
-
-                // Signal to the Activity that it needs to request permission and
-                // try the delete again if it succeeds.
                 pendingDeleteImage = images.first()
                 _permissionNeededForDelete.postValue(
                     recoverableSecurityException.userAction.actionIntent.intentSender
@@ -513,98 +274,20 @@ class ActionViewModel(
         }
     }
 
-    /**
-     * Since we register a [ContentObserver], we want to unregister this when the `ViewModel`
-     * is being released.
-     */
-    override fun onCleared() {
-        contentObserver?.let {
-            getApplication<Application>().contentResolver.unregisterContentObserver(it)
-        }
-        videoContentObserver?.let {
-            getApplication<Application>().contentResolver.unregisterContentObserver(it)
-        }
-    }
-
-    init {
-        loadAlbums()
-    }
-
-    private fun databaseMark(image: MediaStoreImage) = viewModelScope.launch {
-        imageRepository.mark(image)
-    }
-
-    private fun databaseUnmark(image: MediaStoreImage) = viewModelScope.launch {
-        imageRepository.unmark(image)
-    }
-
-    private fun databaseMarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
-        images.forEach {
-            if (it.isExcluded) return@forEach
-            imageRepository.mark(it.copy(isMarked = true))
-        }
-    }
-
-    private fun databaseRemoveAll() = databaseUnmarkAll(_images.value)
-
-    fun removeId(id: Long) = viewModelScope.launch {
-        imageRepository.removeId(id)
-    }
-
-    fun markAllImages() {
-        databaseMarkAll(images = _images.value)
-        _images.update { currentList ->
-            currentList.map {
-                if (!it.isExcluded) it.copy(isMarked = true)
-                else it
-            }
-        }
-    }
-
-    fun unMarkAll() {
-        databaseUnmarkAll(_images.value)
-        _images.update { currentList ->
-            currentList.map { it.copy(isMarked = false) }
-        }
-        _lastMarked.value = emptyList()
-    }
-
-    private fun databaseUnmarkAll(images: List<MediaStoreImage>) = viewModelScope.launch {
-        images.forEach {
-            imageRepository.unmark(it.copy(isMarked = false))
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
+    // --- ViewModel Factory ---
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(
                 modelClass: Class<T>,
                 extras: CreationExtras
             ): T {
-                val application = checkNotNull(extras[APPLICATION_KEY])
-
+                val application = checkNotNull(extras[APPLICATION_KEY]) as OblivionisApplication
                 return ActionViewModel(
-                    application = application,
-                    imageRepository = (application as OblivionisApplication).repository
+                    application,
+                    application.repository
                 ) as T
             }
         }
     }
-}
-
-/**
- * Convenience extension method to register a [ContentObserver] given a lambda.
- */
-private fun ContentResolver.registerObserver(
-    uri: Uri,
-    observer: (selfChange: Boolean) -> Unit
-): ContentObserver {
-    val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean) {
-            observer(selfChange)
-        }
-    }
-    registerContentObserver(uri, true, contentObserver)
-    return contentObserver
 }

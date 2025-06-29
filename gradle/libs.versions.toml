@@ -23,8 +23,11 @@ media3ExoplayerDash = "1.7.1"
 media3Session = "1.7.1"
 media3Ui = "1.7.1"
 navigationCompose = "2.9.0"
+pagingCompose = "3.3.6"
+pagingRuntime = "3.3.6"
 roomCompiler = "2.7.2"
 roomKtx = "2.7.2"
+roomPaging = "2.7.2"
 roomRuntime = "2.7.2"
 workRuntimeKtx = "2.10.2"
 
@@ -43,8 +46,11 @@ androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", versi
 androidx-media3-session = { module = "androidx.media3:media3-session", version.ref = "media3Session" }
 androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "pagingCompose" }
+androidx-paging-runtime = { module = "androidx.paging:paging-runtime", version.ref = "pagingRuntime" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx" }
+androidx-room-paging = { module = "androidx.room:room-paging", version.ref = "roomPaging" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 coil = { module = "io.coil-kt.coil3:coil-android", version.ref = "coil" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose-android", version.ref = "coilCompose" }

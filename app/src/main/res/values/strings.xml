@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Oblivionis</string>
-    <string name="deleteAllConfirmation">This action will delete ALL of these media.</string>
+    <string name="deleteAllConfirmation">This action will mark ALL of these media to delete.</string>
     <string name="restoreConfirmation">This image/video will be restored.</string>
     <string name="close">Close</string>
     <string name="deleteAll">Delete All</string>
@@ -11,7 +11,7 @@
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
     <string name="happy_deleting">Happy Deleting</string>
-    <string name="congratulations">Congratulations!\nThere is nothing to delete.</string>
+    <string name="congratulations">All photos have been marked.\n Please proceed to \"Trash\" for the next step.</string>
     <string name="nothing_to_do">There is nothing to do.</string>
     <string name="choose_app">Choose an app to open this media</string>
     <string name="restoreAllConfirmation">This action will restore all the media here.</string>
@@ -51,4 +51,6 @@
     <string name="d1">1 Day</string>
     <string name="notification_perission_description">Allow Oblivionis push notifications. Related feature still needs to be enabled in the settings.</string>
     <string name="pager_count" translatable="false">%1$d / %2$d</string>
+    <string name="error_loading">Loading Error</string>
+    <string name="deselect_all">Deselect All</string>
 </resources>

@@ -26,8 +26,8 @@ android {
         applicationId = "top.maary.oblivionis"
         minSdk = 31
         targetSdk = 35
-        versionCode = 3
-        versionName = "2025.06.25"
+        versionCode = 4
+        versionName = "2025.06.29"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -147,4 +147,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.constraintlayout.compose)
 
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+    implementation(libs.androidx.room.paging)
 }
