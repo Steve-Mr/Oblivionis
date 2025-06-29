@@ -11,7 +11,7 @@
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
     <string name="happy_deleting">Happy Deleting</string>
-    <string name="congratulations">Congratulations!\nThere is nothing to delete.</string>
+    <string name="congratulations">All photos have been marked.\n Please proceed to \"Trash\" for the next step.</string>
     <string name="nothing_to_do">There is nothing to do.</string>
     <string name="choose_app">Choose an app to open this media</string>
     <string name="restoreAllConfirmation">This action will restore all the media here.</string>

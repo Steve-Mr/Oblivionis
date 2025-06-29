@@ -466,7 +466,7 @@ fun PlaceHolder(
                 .height(250.dp)
         ) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(16.dp),
                 contentAlignment = Alignment.Center // Center the Text inside the Box
             ) {
                 Text(
