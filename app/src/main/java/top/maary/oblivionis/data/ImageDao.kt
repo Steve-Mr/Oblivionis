@@ -61,7 +61,7 @@ interface ImageDao {
     fun getMarkedCountStream(albumPath: String): Flow<Int>
 
     /**
-     * 【新增】通过ID列表删除数据库中的图片记录。
+     * 通过ID列表删除数据库中的图片记录。
      * 这个方法将在用户确认删除后，用于清理数据库。
      * @param ids 要从数据库中删除的图片记录的 ID 集合。
      */
@@ -69,7 +69,7 @@ interface ImageDao {
     suspend fun deleteImagesByIds(ids: Set<Long>)
 
     /**
-     * 【补充】为了让 ViewModel 中的 'deleteSelection' 能工作，我们还需要这个方法。
+     * 为了让 ViewModel 中的 'deleteSelection' 能工作，我们还需要这个方法。
      * 它根据ID列表获取完整的 MediaStoreImage 对象。
      */
     @Query("SELECT * FROM images WHERE id IN (:ids)")

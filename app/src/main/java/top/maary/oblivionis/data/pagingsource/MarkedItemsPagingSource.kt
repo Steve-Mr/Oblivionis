@@ -9,7 +9,7 @@ import top.maary.oblivionis.data.MediaEntity
 /**
  * 一个专门为 RecycleScreen 设计的 PagingSource。
  * 它直接从 Room 数据库中按页加载被标记为删除的图片。
- * 【新】它现在可以监听数据库变化并自动刷新。
+ * 它现在可以监听数据库变化并自动刷新。
  */
 class MarkedItemsPagingSource(
     private val database: ImageDatabase, // 【修改】依赖整个 database
@@ -18,7 +18,7 @@ class MarkedItemsPagingSource(
 
     private val imageDao = database.imageDao()
 
-    // 【新增】创建数据库表变化的观察者
+    // 创建数据库表变化的观察者
     private val observer = object : InvalidationTracker.Observer(arrayOf("images")) {
         override fun onInvalidated(tables: Set<String>) {
             invalidate()
@@ -26,10 +26,10 @@ class MarkedItemsPagingSource(
     }
 
     init {
-        // 【新增】注册观察者
+        // 注册观察者
         database.invalidationTracker.addObserver(observer)
 
-        // 【新增】在 PagingSource 失效时注销观察者
+        // 在 PagingSource 失效时注销观察者
         registerInvalidatedCallback {
             database.invalidationTracker.removeObserver(observer)
         }

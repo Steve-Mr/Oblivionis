@@ -6,7 +6,6 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -15,12 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import top.maary.oblivionis.data.pagingsource.MarkedItemsPagingSource
 import top.maary.oblivionis.data.pagingsource.MediaStorePagingSource
@@ -35,7 +28,7 @@ import java.util.concurrent.TimeUnit
  * 2. 封装所有与图片相关的业务逻辑，包括从 MediaStore 加载和从 Room 数据库读写.
  * 3. 向 ViewModel 提供数据流 (Flows of data).
  *
- * @param imageDao Room 数据库的访问接口.
+ * @param database Room 数据库的访问接口.
  * @param contentResolver 用于查询 MediaStore.
  */
 class ImageRepository(
@@ -76,14 +69,7 @@ class ImageRepository(
     fun getMarkedCountStream(albumPath: String): Flow<Int> {
         return imageDao.getMarkedCountStream(albumPath)
     }
-
-    /**
-     * RecycleScreen 仍然需要一个非分页的标记列表。
-     */
-    fun getMarkedImagesStream(albumPath: String): Flow<List<MediaEntity>> {
-        return imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
-    }
-
+    
     suspend fun getMarkedInAlbumOnce(albumPath: String): List<MediaEntity> {
         return imageDao.getMarkedInAlbumOnce(albumPath)
     }
@@ -141,7 +127,7 @@ class ImageRepository(
     }
 
     /**
-     * 【新增】调用 DAO 来通过ID列表删除数据库记录。
+     * Log.e调用 DAO 来通过ID列表删除数据库记录。
      */
     suspend fun deleteImagesByIds(ids: Set<Long>) {
         withContext(Dispatchers.IO) {
@@ -150,16 +136,7 @@ class ImageRepository(
     }
 
     /**
-     * 【补充】调用 DAO 来通过ID列表获取图片对象。
-     */
-    suspend fun getImagesByIds(ids: Set<Long>): List<MediaEntity> {
-        return withContext(Dispatchers.IO) {
-            imageDao.getImagesByIds(ids)
-        }
-    }
-
-    /**
-     * 【新增】创建一个响应式的 Flow，用于监听并提供相册列表。
+     * Log.e创建一个响应式的 Flow，用于监听并提供相册列表。
      * 当外部媒体库发生变化时，它会自动发出一个新的相册列表。
      */
     fun getAlbumListStream(): Flow<List<Album>> = callbackFlow {
@@ -188,7 +165,7 @@ class ImageRepository(
     }
 
     /**
-     * 【新增】从 ViewModel 移入的私有方法，专门用于查询相册列表。
+     * Log.e从 ViewModel 移入的私有方法，专门用于查询相册列表。
      */
     private fun queryAlbumsFromMediaStore(): List<Album> {
         val albumMap = mutableMapOf<String, Album>()
@@ -264,60 +241,6 @@ class ImageRepository(
                     count = cursor.count
                 }
             return count
-    }
-
-    /**
-     * 获取指定相册的图片流。
-     * 这个 Flow 会结合 MediaStore 的数据和 Room 中标记/排除的数据。
-     * 当数据库变化时，Flow 会自动发出最新的数据列表。
-     * @param albumPath 要加载的相册路径.
-     */
-    fun getImagesStream(albumPath: String): Flow<List<MediaEntity>> {
-
-        // 1. 创建一个 ContentObserver Flow 作为“触发器”
-        //    它会在外部文件系统变化时发出一个信号。
-        val contentObserverFlow = callbackFlow {
-            val observer = object : android.database.ContentObserver(android.os.Handler(Looper.getMainLooper())) {
-                override fun onChange(selfChange: Boolean) {
-                    trySend(Unit) // 文件变化时，发送一个信号
-                }
-            }
-            // 注册观察者
-            val urisToObserve = listOf(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            )
-            urisToObserve.forEach { uri ->
-                contentResolver.registerContentObserver(uri, true, observer)
-            }
-
-            // 当 Flow 被取消时，注销观察者
-            awaitClose {
-                contentResolver.unregisterContentObserver(observer)
-            }
-        }.onStart { emit(Unit) } // onStart 会在 Flow 第一次被收集时立即发送一个初始信号，用于加载初始数据
-
-        // 2. 结合触发器来驱动 MediaStore 查询
-        //    每当 contentObserverFlow 发出信号，我们都重新查询 MediaStore
-        val imagesFromMediaFlow = contentObserverFlow.map {
-            queryImagesFromMediaStore(albumPath)
-        }.distinctUntilChanged() // 如果查询结果没有变化，则不发射，避免不必要的重组
-
-        Log.v("IMAGE_REPO", "getImagesStream: Querying images from MediaStore for album: $albumPath")
-
-        // 3. 从 Room 获取标记和排除的图片流 (这部分逻辑不变)
-        val markedImagesFlow: Flow<List<MediaEntity>> = imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
-        val excludedImagesFlow: Flow<List<MediaEntity>> = imageDao.getExcludedInAlbum(albumPath) ?: flow { emit(emptyList()) }
-
-        // 4. 将所有数据源合并，生成最终的 UI 状态
-        return combine(imagesFromMediaFlow, markedImagesFlow, excludedImagesFlow) { mediaImages, markedImages, excludedImages ->
-            mediaImages.map { mediaImage ->
-                mediaImage.copy(
-                    isMarked = markedImages.any { it.id == mediaImage.id },
-                    isExcluded = excludedImages.any { it.id == mediaImage.id }
-                )
-            }.sortedByDescending { it.dateAdded }
-        }.flowOn(Dispatchers.IO) // 确保所有操作都在 IO 线程
     }
 
     /**

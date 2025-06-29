@@ -42,7 +42,7 @@ class UndoManager {
      */
     fun pop(): MediaEntity? {
         val stack = stacksByAlbum[currentAlbumPath]
-        if (stack == null || stack.isEmpty()) {
+        if (stack.isNullOrEmpty()) {
             return null
         }
         val poppedImage = stack.pop()

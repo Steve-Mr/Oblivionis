@@ -1,5 +1,6 @@
 package top.maary.oblivionis.ui.screen
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.provider.MediaStore
 import android.util.Log
@@ -74,6 +75,7 @@ import top.maary.oblivionis.ui.PlaceHolder
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import kotlin.math.absoluteValue
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ActionScreen(
@@ -91,8 +93,6 @@ fun ActionScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
-
-//    val markedImages by viewModel.markedImagesFlow.collectAsState(initial = emptyList())
 
     val visuallyRemovedItems = remember { mutableStateOf(setOf<Long>()) }
 

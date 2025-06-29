@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
-import android.util.Log
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.room.InvalidationTracker
@@ -31,7 +30,6 @@ class MediaStorePagingSource(
 
     private val observer = object : InvalidationTracker.Observer(arrayOf("images")) {
         override fun onInvalidated(tables: Set<String>) {
-            Log.d("PAGING_DEBUG", "mediaObserver triggered. Invalidating PagingSource for album: $albumPath")
             invalidate()
         }
     }
@@ -45,13 +43,11 @@ class MediaStorePagingSource(
     }
 
     init {
-        Log.d("PAGING_DEBUG", "PagingSource CREATED for album: '$albumPath'")
         // 在 PagingSource 初始化时，注册观察者
         database.invalidationTracker.addObserver(observer)
         contentResolver.registerContentObserver(MediaStore.Files.getContentUri("external"), true, mediaObserver)
         // 当 PagingSource 失效时（无论是手动还是自动），确保注销观察者，防止内存泄漏
         registerInvalidatedCallback {
-            Log.d("PAGING_DEBUG", "PagingSource INVALIDATED for album: '$albumPath'")
             database.invalidationTracker.removeObserver(observer)
             contentResolver.unregisterContentObserver(mediaObserver)
         }
@@ -68,7 +64,6 @@ class MediaStorePagingSource(
         return try {
             val page = params.key ?: 0
             val offset = page * params.loadSize
-            Log.i("PAGING_DEBUG", "--> load() called: page=$page, offset=$offset, loadSize=${params.loadSize}")
 
             if (markedIdsSnapshot == null || excludedIdsSnapshot == null) {
                 markedIdsSnapshot = imageDao.getMarkedIdsInAlbum(albumPath).toSet()
@@ -81,24 +76,17 @@ class MediaStorePagingSource(
             val media = withContext(Dispatchers.IO) {
                 queryMediaStore(limit = params.loadSize, offset = offset)
             }
-            Log.i("PAGING_DEBUG", "queryMediaStore returned ${media.size} items.")
-
-//            val markedIds = imageDao.getMarkedIdsInAlbum(albumPath)
-//            val excludedIds = imageDao.getExcludedIdsInAlbum(albumPath)
-
+            
             val processedMedia = media
                 .filterNot { currentMarkedIds.contains(it.id) }
                 .map { it.copy(isExcluded = currentExcludedIds.contains(it.id)) }
-
-            Log.i("PAGING_DEBUG", "<-- load() FINISHED. Returning ${processedMedia.size} items. IDs: ${processedMedia.map { it.id }}")
-
+            
             LoadResult.Page(
                 data = processedMedia,
                 prevKey = if (page == 0) null else page - 1,
                 nextKey = if (media.size < params.loadSize) null else page + 1
             )
         } catch (e: Exception) {
-            Log.e("PAGING_DEBUG", "Error during load()", e)
             LoadResult.Error(e)
         }
     }
@@ -106,7 +94,7 @@ class MediaStorePagingSource(
     private fun queryMediaStore(limit: Int, offset: Int): List<MediaEntity> {
         val images = mutableListOf<MediaEntity>()
 
-        // 【核心修改】使用统一的URI，不再需要循环
+        // Log.e使用统一的URI，不再需要循环
         val collection = MediaStore.Files.getContentUri("external")
 
         val projection = arrayOf(
@@ -116,7 +104,7 @@ class MediaStorePagingSource(
             MediaStore.Files.FileColumns.MEDIA_TYPE // 需要这个来区分图片和视频，并构建正确的 content URI
         )
 
-        // 【核心修改】在 selection 中同时指定图片和视频两种媒体类型
+        // Log.e在 selection 中同时指定图片和视频两种媒体类型
         val selection = """
             (${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?)
             AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} like ?
@@ -128,11 +116,6 @@ class MediaStorePagingSource(
             "$albumPath/"
         )
 
-        val sortColumns = arrayOf(
-            MediaStore.Files.FileColumns.DATE_ADDED,
-            MediaStore.Files.FileColumns._ID
-        )
-
         val sortOrder = "${MediaStore.Files.FileColumns.DATE_ADDED} DESC, ${MediaStore.Files.FileColumns._ID} DESC"
 
         val queryArgs = Bundle().apply {
@@ -140,7 +123,7 @@ class MediaStorePagingSource(
             putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
             putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
 
-            // 【核心修改】使用新的、结构化的方式来指定排序
+            // Log.e使用新的、结构化的方式来指定排序
             putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, sortOrder)
 
             // Limit and Offset
@@ -160,7 +143,7 @@ class MediaStorePagingSource(
                 val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
                 val mediaType = cursor.getInt(mediaTypeColumn)
 
-                // 【核心修改】根据媒体类型构建正确的 Content URI
+                // Log.e根据媒体类型构建正确的 Content URI
                 val contentUri = when (mediaType) {
                     MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE ->
                         ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
@@ -170,7 +153,6 @@ class MediaStorePagingSource(
                 }
 
                 val image = MediaEntity(id, displayName, albumPath, dateAdded, contentUri)
-                Log.e("MediaStorePagingSource", "Loaded image: ${image.dateAdded}")
                 images += image
             }
         }

@@ -93,9 +93,8 @@ class ActionViewModel(
         undoManager.syncStateForAlbum(albumPath)
         // 1. 更新UI状态中的相册标题
         _uiState.update {
-            it.copy(
-                albumTitle = albumPath.substringAfterLast("/"),
-                totalImageCount = 0) }
+            it.copy(albumTitle = albumPath.substringAfterLast("/"))
+        }
 
         // 3. 创建并缓存PagingData流，供ActionScreen使用
         imagePagingDataFlow = imageRepository.getImagePagingData(albumPath)
