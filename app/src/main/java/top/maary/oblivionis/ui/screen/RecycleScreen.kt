@@ -31,11 +31,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,19 +48,14 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil3.ImageLoader
 import coil3.video.VideoFrameDecoder
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import top.maary.oblivionis.R
-import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.MediaEntity
 import top.maary.oblivionis.data.PreferenceRepository
 import top.maary.oblivionis.ui.Dialog
 import top.maary.oblivionis.ui.MediaPlayer
 import top.maary.oblivionis.ui.PlaceHolder
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import top.maary.oblivionis.viewmodel.NotificationViewModel
-import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -74,7 +67,7 @@ fun RecycleScreen(
     val context = LocalContext.current
     val dataStore = PreferenceRepository(context)
 
-    val lazyPagingItems: LazyPagingItems<MediaStoreImage> =
+    val lazyPagingItems: LazyPagingItems<MediaEntity> =
         actionViewModel.markedImagePagingDataFlow.collectAsLazyPagingItems()
 
     // --- 状态管理 ---
@@ -200,7 +193,7 @@ fun RecycleScreen(
                                 if (selectAllActive.value) {
                                     actionViewModel.unmarkAllImages(excludeIds = deselectedInSelectAllMode.value)
                                 } else {
-                                    val itemsToRestore = mutableListOf<MediaStoreImage>()
+                                    val itemsToRestore = mutableListOf<MediaEntity>()
                                     for (i in 0 until lazyPagingItems.itemCount) {
                                         val item = lazyPagingItems.peek(i)
                                         if (item != null && item.id in individuallySelectedIds.value) {

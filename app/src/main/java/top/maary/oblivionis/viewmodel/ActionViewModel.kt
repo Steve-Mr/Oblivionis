@@ -2,10 +2,7 @@ package top.maary.oblivionis.viewmodel
 
 import android.app.Application
 import android.app.RecoverableSecurityException
-import android.content.ContentResolver
 import android.content.IntentSender
-import android.database.Cursor
-import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
@@ -35,12 +32,10 @@ import kotlinx.coroutines.withContext
 import top.maary.oblivionis.OblivionisApplication
 import top.maary.oblivionis.data.Album
 import top.maary.oblivionis.data.ImageRepository
-import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.MediaEntity
 import top.maary.oblivionis.data.PreferenceRepository
 import top.maary.oblivionis.ui.ActionUiState
-import java.io.File
 import java.util.Calendar
-import java.util.Stack
 
 class ActionViewModel(
     application: Application,
@@ -52,14 +47,14 @@ class ActionViewModel(
     val uiState: StateFlow<ActionUiState> = _uiState.asStateFlow()
 
     // 新增：持有PagingData流的属性，这是ActionScreen的主要数据源
-    var imagePagingDataFlow: Flow<PagingData<MediaStoreImage>> = emptyFlow()
+    var imagePagingDataFlow: Flow<PagingData<MediaEntity>> = emptyFlow()
         private set
 
     // 这个Flow现在专门为RecycleScreen服务，因为它需要一个完整的、非分页的列表
-    var markedImagePagingDataFlow: Flow<PagingData<MediaStoreImage>> = emptyFlow()
+    var markedImagePagingDataFlow: Flow<PagingData<MediaEntity>> = emptyFlow()
         private set
 
-    private var imagesPendingDeletion: List<MediaStoreImage>? = null
+    private var imagesPendingDeletion: List<MediaEntity>? = null
 
     // --- 业务逻辑状态 ---
     private val undoManager = UndoManager()
@@ -74,7 +69,7 @@ class ActionViewModel(
     private var currentAlbumPath: String? = null
 
     // --- 删除流程状态 ---
-    private var pendingDeleteImage: MediaStoreImage? = null
+    private var pendingDeleteImage: MediaEntity? = null
     private val _permissionNeededForDelete = MutableLiveData<IntentSender?>()
     private val _pendingDeleteIntentSender = MutableStateFlow<IntentSender?>(null)
     val pendingDeleteIntentSender: Flow<IntentSender?> = _pendingDeleteIntentSender
@@ -135,7 +130,7 @@ class ActionViewModel(
 
     // --- 图片操作 ---
 
-    fun markImage(image: MediaStoreImage) {
+    fun markImage(image: MediaEntity) {
         viewModelScope.launch {
             val imageToMark = image.copy(isMarked = true)
             imageRepository.mark(imageToMark)
@@ -173,7 +168,7 @@ class ActionViewModel(
         }
     }
 
-    fun unMarkImage(target: MediaStoreImage) {
+    fun unMarkImage(target: MediaEntity) {
         viewModelScope.launch {
             // 直接调用 repository 的 unmark 方法，它会处理数据库的更新。
             // 由于 markedImagesFlow 是一个响应式数据流，
@@ -192,13 +187,13 @@ class ActionViewModel(
         }
     }
 
-    fun excludeMedia(image: MediaStoreImage) {
+    fun excludeMedia(image: MediaEntity) {
         viewModelScope.launch {
             imageRepository.mark(image.copy(isExcluded = true))
         }
     }
 
-    fun includeMedia(image: MediaStoreImage) {
+    fun includeMedia(image: MediaEntity) {
         viewModelScope.launch {
             imageRepository.unmark(image.copy(isExcluded = true))
         }
@@ -259,7 +254,7 @@ class ActionViewModel(
         }
     }
 
-    private suspend fun performDeleteImageList(images: List<MediaStoreImage>) {
+    private suspend fun performDeleteImageList(images: List<MediaEntity>) {
         if (images.isEmpty()) return
         withContext(Dispatchers.IO) {
             try {

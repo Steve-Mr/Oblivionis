@@ -3,7 +3,7 @@ package top.maary.oblivionis.viewmodel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import top.maary.oblivionis.data.MediaStoreImage
+import top.maary.oblivionis.data.MediaEntity
 import java.util.Stack
 
 /**
@@ -12,13 +12,13 @@ import java.util.Stack
  */
 class UndoManager {
     // 内部私有的状态：存储每个相册的撤销栈
-    private val stacksByAlbum = mutableMapOf<String, Stack<MediaStoreImage>>()
+    private val stacksByAlbum = mutableMapOf<String, Stack<MediaEntity>>()
 
     // 内部私有的、可变的 StateFlow，用于驱动UI
-    private val _lastMarkedImage = MutableStateFlow<MediaStoreImage?>(null)
+    private val _lastMarkedImage = MutableStateFlow<MediaEntity?>(null)
 
     // 对外只暴露不可变的 StateFlow，供 ViewModel 监听
-    val lastMarkedImage: StateFlow<MediaStoreImage?> = _lastMarkedImage.asStateFlow()
+    val lastMarkedImage: StateFlow<MediaEntity?> = _lastMarkedImage.asStateFlow()
 
     // 当前正在操作的相册路径
     private var currentAlbumPath: String? = null
@@ -27,7 +27,7 @@ class UndoManager {
      * 当用户标记一张图片时调用。
      * @param image 被标记的图片。
      */
-    fun push(image: MediaStoreImage) {
+    fun push(image: MediaEntity) {
         val stack = stacksByAlbum.getOrPut(image.album) { Stack() }
         stack.push(image)
         // 只有当操作发生在当前相册时，才更新UI状态
@@ -40,7 +40,7 @@ class UndoManager {
      * 当用户点击“撤销”时调用。
      * @return 返回被撤销的图片，ViewModel 需要用它来更新数据库。
      */
-    fun pop(): MediaStoreImage? {
+    fun pop(): MediaEntity? {
         val stack = stacksByAlbum[currentAlbumPath]
         if (stack == null || stack.isEmpty()) {
             return null

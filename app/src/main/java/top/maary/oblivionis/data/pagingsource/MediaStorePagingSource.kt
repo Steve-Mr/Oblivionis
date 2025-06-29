@@ -1,4 +1,4 @@
-package top.maary.oblivionis.data
+package top.maary.oblivionis.data.pagingsource
 
 import android.content.ContentResolver
 import android.content.ContentUris
@@ -13,6 +13,8 @@ import androidx.paging.PagingState
 import androidx.room.InvalidationTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import top.maary.oblivionis.data.ImageDatabase
+import top.maary.oblivionis.data.MediaEntity
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -20,7 +22,7 @@ class MediaStorePagingSource(
     private val contentResolver: ContentResolver,
     private val database: ImageDatabase,
     private val albumPath: String
-) : PagingSource<Int, MediaStoreImage>() {
+) : PagingSource<Int, MediaEntity>() {
 
     private val imageDao = database.imageDao()
 
@@ -55,14 +57,14 @@ class MediaStorePagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, MediaStoreImage>): Int? {
+    override fun getRefreshKey(state: PagingState<Int, MediaEntity>): Int? {
         return state.anchorPosition?.let { anchorPosition ->
             state.closestPageToPosition(anchorPosition)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchorPosition)?.nextKey?.minus(1)
         }
     }
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, MediaStoreImage> {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, MediaEntity> {
         return try {
             val page = params.key ?: 0
             val offset = page * params.loadSize
@@ -101,8 +103,8 @@ class MediaStorePagingSource(
         }
     }
 
-    private fun queryMediaStore(limit: Int, offset: Int): List<MediaStoreImage> {
-        val images = mutableListOf<MediaStoreImage>()
+    private fun queryMediaStore(limit: Int, offset: Int): List<MediaEntity> {
+        val images = mutableListOf<MediaEntity>()
 
         // 【核心修改】使用统一的URI，不再需要循环
         val collection = MediaStore.Files.getContentUri("external")
@@ -167,7 +169,7 @@ class MediaStorePagingSource(
                     else -> continue // 忽略其他类型
                 }
 
-                val image = MediaStoreImage(id, displayName, albumPath, dateAdded, contentUri)
+                val image = MediaEntity(id, displayName, albumPath, dateAdded, contentUri)
                 Log.e("MediaStorePagingSource", "Loaded image: ${image.dateAdded}")
                 images += image
             }

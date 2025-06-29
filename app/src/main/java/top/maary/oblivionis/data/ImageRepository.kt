@@ -1,6 +1,5 @@
 package top.maary.oblivionis.data
 
-import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.database.ContentObserver
@@ -23,6 +22,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
+import top.maary.oblivionis.data.pagingsource.MarkedItemsPagingSource
+import top.maary.oblivionis.data.pagingsource.MediaStorePagingSource
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -43,7 +44,7 @@ class ImageRepository(
 ) {
     private val imageDao = database.imageDao()
 
-    fun getImagePagingData(albumPath: String): Flow<PagingData<MediaStoreImage>> {
+    fun getImagePagingData(albumPath: String): Flow<PagingData<MediaEntity>> {
         return Pager(
             config = PagingConfig(
                 pageSize = 20, // 每次加载20个
@@ -55,7 +56,7 @@ class ImageRepository(
         ).flow
     }
 
-    fun getMarkedImagePagingData(albumPath: String): Flow<PagingData<MediaStoreImage>> {
+    fun getMarkedImagePagingData(albumPath: String): Flow<PagingData<MediaEntity>> {
         return Pager(
             config = PagingConfig(
                 pageSize = 30, // 回收站每页可以加载更多，比如30个
@@ -79,11 +80,11 @@ class ImageRepository(
     /**
      * RecycleScreen 仍然需要一个非分页的标记列表。
      */
-    fun getMarkedImagesStream(albumPath: String): Flow<List<MediaStoreImage>> {
+    fun getMarkedImagesStream(albumPath: String): Flow<List<MediaEntity>> {
         return imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
     }
 
-    suspend fun getMarkedInAlbumOnce(albumPath: String): List<MediaStoreImage> {
+    suspend fun getMarkedInAlbumOnce(albumPath: String): List<MediaEntity> {
         return imageDao.getMarkedInAlbumOnce(albumPath)
     }
 
@@ -151,7 +152,7 @@ class ImageRepository(
     /**
      * 【补充】调用 DAO 来通过ID列表获取图片对象。
      */
-    suspend fun getImagesByIds(ids: Set<Long>): List<MediaStoreImage> {
+    suspend fun getImagesByIds(ids: Set<Long>): List<MediaEntity> {
         return withContext(Dispatchers.IO) {
             imageDao.getImagesByIds(ids)
         }
@@ -271,7 +272,7 @@ class ImageRepository(
      * 当数据库变化时，Flow 会自动发出最新的数据列表。
      * @param albumPath 要加载的相册路径.
      */
-    fun getImagesStream(albumPath: String): Flow<List<MediaStoreImage>> {
+    fun getImagesStream(albumPath: String): Flow<List<MediaEntity>> {
 
         // 1. 创建一个 ContentObserver Flow 作为“触发器”
         //    它会在外部文件系统变化时发出一个信号。
@@ -305,8 +306,8 @@ class ImageRepository(
         Log.v("IMAGE_REPO", "getImagesStream: Querying images from MediaStore for album: $albumPath")
 
         // 3. 从 Room 获取标记和排除的图片流 (这部分逻辑不变)
-        val markedImagesFlow: Flow<List<MediaStoreImage>> = imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
-        val excludedImagesFlow: Flow<List<MediaStoreImage>> = imageDao.getExcludedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+        val markedImagesFlow: Flow<List<MediaEntity>> = imageDao.getMarkedInAlbum(albumPath) ?: flow { emit(emptyList()) }
+        val excludedImagesFlow: Flow<List<MediaEntity>> = imageDao.getExcludedInAlbum(albumPath) ?: flow { emit(emptyList()) }
 
         // 4. 将所有数据源合并，生成最终的 UI 状态
         return combine(imagesFromMediaFlow, markedImagesFlow, excludedImagesFlow) { mediaImages, markedImages, excludedImages ->
@@ -324,7 +325,7 @@ class ImageRepository(
      * @param image 要标记的图片.
      */
     @WorkerThread
-    suspend fun mark(image: MediaStoreImage) {
+    suspend fun mark(image: MediaEntity) {
         withContext(Dispatchers.IO) {
             imageDao.mark(image)
         }
@@ -335,7 +336,7 @@ class ImageRepository(
      * @param image 要取消标记的图片.
      */
     @WorkerThread
-    suspend fun unmark(image: MediaStoreImage) {
+    suspend fun unmark(image: MediaEntity) {
         withContext(Dispatchers.IO) {
             // 如果图片同时是 marked 和 excluded，unmark 只应该移除 marked 状态
             if (image.isMarked && image.isExcluded) {
@@ -349,8 +350,8 @@ class ImageRepository(
     /**
      * 从 MediaStore 查询指定相册的所有图片和视频.
      */
-    private fun queryImagesFromMediaStore(albumPath: String): List<MediaStoreImage> {
-        val images = mutableListOf<MediaStoreImage>()
+    private fun queryImagesFromMediaStore(albumPath: String): List<MediaEntity> {
+        val images = mutableListOf<MediaEntity>()
         val uriList = listOf(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
@@ -376,7 +377,7 @@ class ImageRepository(
                         val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
                         val displayName = cursor.getString(displayNameColumn)
                         val contentUri = ContentUris.withAppendedId(uri, id)
-                        val image = MediaStoreImage(id, displayName, albumPath, dateAdded, contentUri)
+                        val image = MediaEntity(id, displayName, albumPath, dateAdded, contentUri)
                         images += image
                     }
                 }

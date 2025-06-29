@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 import java.util.Date
 
 @Entity(tableName = "images")
-data class MediaStoreImage(
+data class MediaEntity(
     @PrimaryKey val id: Long,
     @ColumnInfo(name = "display_name") val displayName: String,
     @ColumnInfo(name = "album", defaultValue = "") val album: String,

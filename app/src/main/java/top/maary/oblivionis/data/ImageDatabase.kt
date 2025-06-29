@@ -3,7 +3,6 @@ package top.maary.oblivionis.data
 import android.content.Context
 import androidx.room.AutoMigration
 import androidx.room.Database
-import androidx.room.InvalidationTracker
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -16,7 +15,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-@Database(entities = [MediaStoreImage::class], version = 3, exportSchema = true,
+@Database(entities = [MediaEntity::class], version = 3, exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)]
 )
 @TypeConverters(Converters::class)

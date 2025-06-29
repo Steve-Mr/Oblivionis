@@ -1,8 +1,10 @@
-package top.maary.oblivionis.data
+package top.maary.oblivionis.data.pagingsource
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.room.InvalidationTracker
+import top.maary.oblivionis.data.ImageDatabase
+import top.maary.oblivionis.data.MediaEntity
 
 /**
  * 一个专门为 RecycleScreen 设计的 PagingSource。
@@ -12,7 +14,7 @@ import androidx.room.InvalidationTracker
 class MarkedItemsPagingSource(
     private val database: ImageDatabase, // 【修改】依赖整个 database
     private val albumPath: String
-) : PagingSource<Int, MediaStoreImage>() {
+) : PagingSource<Int, MediaEntity>() {
 
     private val imageDao = database.imageDao()
 
@@ -33,14 +35,14 @@ class MarkedItemsPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, MediaStoreImage>): Int? {
+    override fun getRefreshKey(state: PagingState<Int, MediaEntity>): Int? {
         return state.anchorPosition?.let { anchorPosition ->
             state.closestPageToPosition(anchorPosition)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchorPosition)?.nextKey?.minus(1)
         }
     }
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, MediaStoreImage> {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, MediaEntity> {
         return try {
             val page = params.key ?: 0
             val pageSize = params.loadSize
