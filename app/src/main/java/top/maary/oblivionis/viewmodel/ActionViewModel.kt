@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,8 +64,12 @@ class ActionViewModel(
     // --- 业务逻辑状态 ---
     private val undoManager = UndoManager()
 
-    private val _albums = MutableStateFlow<List<Album>>(emptyList())
-    val albums: StateFlow<List<Album>> get() = _albums
+    val albums: StateFlow<List<Album>> = imageRepository.getAlbumListStream()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000), // 5秒后停止共享，节省资源
+            initialValue = emptyList() // 提供一个初始空列表
+        )
 
     private var currentAlbumPath: String? = null
 
@@ -74,26 +80,13 @@ class ActionViewModel(
     val pendingDeleteIntentSender: Flow<IntentSender?> = _pendingDeleteIntentSender
 
     init {
-        loadAlbums()
-
         undoManager.lastMarkedImage
             .onEach { newLastMarked ->
                 _uiState.update { it.copy(lastMarkedImage = newLastMarked) }
             }
             .launchIn(viewModelScope) // 在 viewModelScope 中启动这个监听
     }
-
-    /**
-     * 加载所有相册的列表。
-     */
-    fun loadAlbums() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _albums.value = getAlbumsFromMediaStore(getApplication<Application>().contentResolver)
-        }
-    }
-
-    private var countJob: Job? = null
-    private var markedCountJob: Job? = null
+    
     private var aggregateDataJob: Job? = null
     /**
      * 为指定的相册加载图片数据。
@@ -115,21 +108,6 @@ class ActionViewModel(
 
         markedImagePagingDataFlow = imageRepository.getMarkedImagePagingData(albumPath)
             .cachedIn(viewModelScope) // 同样进行缓存
-
-//        countJob?.cancel()
-//        countJob = imageRepository.getAlbumTotalCountStream(albumPath)
-//            .onEach { count ->
-//                _uiState.update { it.copy(totalImageCount = count) }
-//            }
-//            .launchIn(viewModelScope)
-//
-//        markedCountJob?.cancel() // 取消上一个相册的监听
-//        markedCountJob = imageRepository.getMarkedCountStream(albumPath)
-//            .onEach { count ->
-//                // 每当计数值变化时，更新 UI State
-//                _uiState.update { it.copy(markedImageCount = count) }
-//            }
-//            .launchIn(viewModelScope)
 
         aggregateDataJob?.cancel()
         aggregateDataJob = viewModelScope.launch {
@@ -274,9 +252,6 @@ class ActionViewModel(
             imagesPendingDeletion = null
             _pendingDeleteIntentSender.value = null
 
-            // 4. 重新加载相册列表以更新计数
-            loadAlbums()
-
             // 5. 这是一个大规模操作，也应该清空当前相册的“撤销”历史
             deletedImages.firstOrNull()?.album?.let { albumPath ->
                 undoManager.clearHistoryForCurrentAlbum(albumPath)
@@ -303,45 +278,6 @@ class ActionViewModel(
                 )
             }
         }
-    }
-
-    // --- 辅助方法 ---
-
-    private fun getAlbumsFromMediaStore(contentResolver: ContentResolver): List<Album> {
-        val albumMap = mutableMapOf<String, Album>()
-        val uriList = listOf(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        )
-        val projection = arrayOf(
-            MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
-            MediaStore.Images.Media.DATA,
-        )
-        val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC"
-
-        for (uri in uriList) {
-            contentResolver.query(uri, projection, null, null, sortOrder)
-                ?.use { cursor ->
-                    val nameColumn =
-                        cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-                    val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-
-                    while (cursor.moveToNext()) {
-                        val name = cursor.getString(nameColumn) ?: ""
-                        val path = File(cursor.getString(pathColumn)).parent?.replace(
-                            "/storage/emulated/0/", ""
-                        )?.replace("/storage/emulated/0", "") ?: continue
-
-                        val album = albumMap[path]
-                        if (album == null) {
-                            albumMap[path] = Album(name, path, 1)
-                        } else {
-                            albumMap[path] = album.copy(mediaCount = album.mediaCount + 1)
-                        }
-                    }
-                }
-        }
-        return albumMap.values.toList()
     }
 
     // --- ViewModel Factory ---

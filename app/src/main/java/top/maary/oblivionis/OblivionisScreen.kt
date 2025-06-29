@@ -61,7 +61,6 @@ fun OblivionisApp(
 
     fun welcomePermissionBasicLogic() {
         scope.launch { dataStore.setPermissionGranted(true) }
-        actionViewModel.loadAlbums()
         Log.v("OBLIVIONIS", "PERMISSION ${runBlocking { dataStore.permissionGranted.first() }}")
         navController.navigate(welcomeScreenNextDest.value) {
             popUpTo(OblivionisScreen.Welcome.name) {

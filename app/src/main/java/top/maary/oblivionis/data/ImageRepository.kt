@@ -158,6 +158,87 @@ class ImageRepository(
     }
 
     /**
+     * 【新增】创建一个响应式的 Flow，用于监听并提供相册列表。
+     * 当外部媒体库发生变化时，它会自动发出一个新的相册列表。
+     */
+    fun getAlbumListStream(): Flow<List<Album>> = callbackFlow {
+        // 1. 定义 ContentObserver
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                // 当媒体库变化时，重新查询相册列表并发送
+                trySend(queryAlbumsFromMediaStore())
+            }
+        }
+
+        // 2. 注册观察者来监听所有外部媒体文件的变化
+        contentResolver.registerContentObserver(
+            MediaStore.Files.getContentUri("external"),
+            true,
+            observer
+        )
+
+        // 3. 在 Flow 第一次被收集时，立即发送一个初始的相册列表
+        trySend(queryAlbumsFromMediaStore())
+
+        // 4. 当 Flow 关闭时（例如 ViewModel 被销毁），注销观察者以防内存泄漏
+        awaitClose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+
+    /**
+     * 【新增】从 ViewModel 移入的私有方法，专门用于查询相册列表。
+     */
+    private fun queryAlbumsFromMediaStore(): List<Album> {
+        val albumMap = mutableMapOf<String, Album>()
+        // 【优化】直接查询外部文件 URI，覆盖图片和视频
+        val collection = MediaStore.Files.getContentUri("external")
+
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME,
+            MediaStore.Files.FileColumns.RELATIVE_PATH,
+            MediaStore.Files.FileColumns._ID // 只需要一个ID列来计数
+        )
+
+        // 【优化】通过 selection 过滤掉非图片和视频的文件
+        val selection = """
+            ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR 
+            ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?
+        """.trimIndent()
+        val selectionArgs = arrayOf(
+            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
+        )
+
+        val sortOrder = "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
+
+        contentResolver.query(collection, projection, selection, selectionArgs, sortOrder)
+            ?.use { cursor ->
+                val nameColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)
+                val pathColumn =
+                    cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.RELATIVE_PATH)
+
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(nameColumn) ?: "Unknown"
+                    // 【优化】RELATIVE_PATH 更可靠，且无需处理 File 对象
+                    val path = cursor.getString(pathColumn)?.removeSuffix("/") ?: continue
+
+                    // 如果路径为空（例如在存储根目录下的图片），则跳过
+                    if (path.isEmpty()) continue
+
+                    val album = albumMap[path]
+                    if (album == null) {
+                        albumMap[path] = Album(name, path, 1)
+                    } else {
+                        albumMap[path] = album.copy(mediaCount = album.mediaCount + 1)
+                    }
+                }
+            }
+        return albumMap.values.toList().sortedByDescending { it.mediaCount }
+    }
+
+    /**
      * 获取指定相册中的媒体总数。
      * 这是一个轻量级操作，只用于显示计数。
      * @param albumPath 要查询的相册路径。
