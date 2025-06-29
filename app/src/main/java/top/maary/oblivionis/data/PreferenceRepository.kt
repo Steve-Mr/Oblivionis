@@ -20,6 +20,7 @@ class PreferenceRepository(private val context: Context) {
         val NOTIFICATION_INTERVAL_CAL_FIXED = booleanPreferencesKey("NOTIFICATION_INTERVAL_CAL_FIXED")
         val NOTIFICATION_INTERVAL_START = intPreferencesKey("NOTIFICATION_INTERVAL_START")
         val NOTIFICATION_TIME = stringPreferencesKey("NOTIFICATION_TIME")
+        val V3_ALBUM_BACKFILL_NEEDED = booleanPreferencesKey("V3_ALBUM_BACKFILL_NEEDED")
     }
 
     val permissionGranted = context.dataStore.data.map { preferences ->
@@ -90,6 +91,17 @@ class PreferenceRepository(private val context: Context) {
     suspend fun setNotificationTime(hour: Int, minute: Int) {
         context.dataStore.edit { preferences ->
             preferences[NOTIFICATION_TIME] = String.format("%02d:%02d", hour, minute)
+        }
+    }
+
+    val v3AlbumBackfillNeeded = context.dataStore.data.map { preferences ->
+        // 默认返回 true，表示需要执行回填
+        preferences[V3_ALBUM_BACKFILL_NEEDED] ?: true
+    }
+
+    suspend fun setV3AlbumBackfillNeeded(needed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[V3_ALBUM_BACKFILL_NEEDED] = needed
         }
     }
 

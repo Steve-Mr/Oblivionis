@@ -2,7 +2,6 @@ package top.maary.oblivionis.ui
 
 import android.net.Uri
 import android.provider.MediaStore
-import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -10,7 +9,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,8 +28,6 @@ import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
@@ -74,7 +70,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import top.maary.oblivionis.R
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaPlayer(
     modifier: Modifier,
@@ -149,6 +144,7 @@ fun ActionRow(
     onRollBackButtonClicked: () -> Unit,
     onShareButtonClicked: () -> Unit,
     showRestore: Boolean,
+    showShare: Boolean,
     currentPage: Int,
     pagesCount: Int
 ) {
@@ -259,20 +255,23 @@ fun ActionRow(
             }
         }
 
-        Button(
-            onClick = onShareButtonClicked,
-            enabled = true,
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier
-                .size(48.dp)
-                .align(Alignment.CenterEnd),
-            colors = ButtonDefaults.outlinedButtonColors()
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_share),
-                contentDescription = stringResource(R.string.share_media)
-            )
+        if (showShare) {
+
+            Button(
+                onClick = onShareButtonClicked,
+                enabled = true,
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .align(Alignment.CenterEnd),
+                colors = ButtonDefaults.outlinedButtonColors()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = stringResource(R.string.share_media)
+                )
+            }
         }
 
         if (showRestore) {
@@ -466,7 +465,7 @@ fun PlaceHolder(
                 .height(250.dp)
         ) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(16.dp),
                 contentAlignment = Alignment.Center // Center the Text inside the Box
             ) {
                 Text(

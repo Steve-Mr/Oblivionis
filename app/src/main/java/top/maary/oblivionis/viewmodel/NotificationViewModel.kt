@@ -26,7 +26,7 @@ class NotificationViewModel(application: Application): AndroidViewModel(applicat
         minute: Int,
         interval: Long) {
         val initialDelay = calculateInitialDelay(date, hour, minute)
-        Log.v("OBLIVIONIS", "INITIALDELAY $initialDelay")
+        Log.v("OBLIVIONIS", "INITIAL DELAY $initialDelay")
 
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(interval, TimeUnit.DAYS)
             .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)

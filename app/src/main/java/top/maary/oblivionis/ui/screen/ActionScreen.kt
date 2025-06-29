@@ -1,5 +1,6 @@
 package top.maary.oblivionis.ui.screen
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.provider.MediaStore
 import android.util.Log
@@ -24,10 +25,12 @@ import androidx.compose.material3.BadgeDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -55,10 +59,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil3.ImageLoader
 import coil3.video.VideoFrameDecoder
 import kotlinx.coroutines.coroutineScope
 import top.maary.oblivionis.R
+import top.maary.oblivionis.data.MediaEntity
 import top.maary.oblivionis.ui.ActionRow
 import top.maary.oblivionis.ui.Dialog
 import top.maary.oblivionis.ui.MediaPlayer
@@ -66,7 +75,8 @@ import top.maary.oblivionis.ui.PlaceHolder
 import top.maary.oblivionis.viewmodel.ActionViewModel
 import kotlin.math.absoluteValue
 
-@OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("ConfigurationScreenWidthHeight")
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ActionScreen(
     viewModel: ActionViewModel = viewModel(),
@@ -74,18 +84,34 @@ fun ActionScreen(
     onBackButtonClicked: () -> Unit,
 ) {
 
-    val images = viewModel.unmarkedImages.collectAsState(initial = emptyList())
+    // 从ViewModel获取PagingData流并转换为LazyPagingItems
+    val lazyPagingItems: LazyPagingItems<MediaEntity> =
+        viewModel.imagePagingDataFlow.collectAsLazyPagingItems()
 
-    val marked = viewModel.markedImages.collectAsState(initial = emptyList())
+    LaunchedEffect(lazyPagingItems.itemCount) {
+        Log.e("PAGING_DEBUG", "UI Received PagingData update. Item count: ${lazyPagingItems.itemCount}")
+    }
 
-    val markedCount = viewModel.markedImages.collectAsState(initial = emptyList()).value.size
+    val uiState by viewModel.uiState.collectAsState()
+
+    val visuallyRemovedItems = remember { mutableStateOf(setOf<Long>()) }
+
+    LaunchedEffect(lazyPagingItems.loadState) {
+        if (lazyPagingItems.loadState.refresh is LoadState.NotLoading) {
+            visuallyRemovedItems.value = setOf()
+        }
+        if (lazyPagingItems.loadState.refresh is LoadState.Error) {
+            val error = (lazyPagingItems.loadState.refresh as LoadState.Error).error
+            Log.e("PAGING_DEBUG", "ActionScreen caught Paging LoadState.Error:", error)
+        }
+    }
+
     val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
     val badgeDefaultsColor = BadgeDefaults.containerColor
 
-    val badgeColor by remember(markedCount, secondaryContainerColor, badgeDefaultsColor) {
+    val badgeColor by remember(uiState.markedImageCount, secondaryContainerColor, badgeDefaultsColor) {
         derivedStateOf {
-            // 2. 在 derivedStateOf 中使用已经获取到的颜色值
-            if (markedCount == 0) {
+            if (uiState.markedImageCount == 0) {
                 secondaryContainerColor
             } else {
                 badgeDefaultsColor
@@ -93,12 +119,11 @@ fun ActionScreen(
         }
     }
 
-    val lastMarkedCount = viewModel.lastMarked.collectAsState().value.size
-    val showRestore by remember(lastMarkedCount) {
-        derivedStateOf { lastMarkedCount > 0 }
+    val showRestore by remember(uiState.lastMarkedImage) {
+        derivedStateOf { uiState.lastMarkedImage != null }
     }
 
-    val pagerState = rememberPagerState(pageCount = { images.value.size })
+    val pagerState = rememberPagerState(pageCount = { lazyPagingItems.itemCount })
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
 
@@ -136,7 +161,7 @@ fun ActionScreen(
                             contentDescription = stringResource(id = R.string.back)
                         )
                         Text(
-                            text = viewModel.albumPath.toString().substringAfterLast("/"),
+                            text = uiState.albumTitle,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -144,9 +169,9 @@ fun ActionScreen(
                 },
                 actions = {
                     BadgedBox(modifier = Modifier.padding(end = 8.dp),
-                        badge = { Badge(containerColor = badgeColor) { Text(text = marked.value.size.toString()) } }) {
+                        badge = { Badge(containerColor = badgeColor) { Text(text = uiState.markedImageCount.toString()) } }) {
                         FilledTonalButton(
-                            onClick = { onNextButtonClicked() }, enabled = marked.value.isNotEmpty()
+                            onClick = { onNextButtonClicked() }, enabled = uiState.markedImageCount > 0
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_recycle),
@@ -161,18 +186,23 @@ fun ActionScreen(
         },
         bottomBar = {
             if (openDialog.value) {
-                Dialog(onDismissRequest = { openDialog.value = false }, onConfirmation = {
-                    viewModel.markAllImages()
-                    openDialog.value = false
-                }, dialogText = stringResource(id = R.string.deleteAllConfirmation)
+                Dialog(
+                    onDismissRequest = { openDialog.value = false },
+                    onConfirmation = {
+                        viewModel.markAllImages()
+                        openDialog.value = false },
+                    dialogText = stringResource(id = R.string.deleteAllConfirmation)
                 )
             }
             ActionRow(
                 modifier = Modifier.navigationBarsPadding(),
-                delButtonClickable = images.value.isNotEmpty(),
+                delButtonClickable = lazyPagingItems.itemCount > 0,
                 onDelButtonClicked = {
-                    if (images.value.isNotEmpty()) {
-                        viewModel.markImage(pagerState.currentPage)
+                    if (pagerState.currentPage < lazyPagingItems.itemCount) {
+                        lazyPagingItems[pagerState.currentPage]?.let { image ->
+                            visuallyRemovedItems.value += image.id // 【修改】立即在视觉上隐藏
+                            viewModel.markImage(image)
+                        }
                     }
                 },
                 onDelButtonLongClicked = {
@@ -182,26 +212,42 @@ fun ActionScreen(
                     viewModel.unMarkLastImage()
                 },
                 onShareButtonClicked = {
-                    val uri = images.value[pagerState.currentPage].contentUri
-                    val sendIntent: Intent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        type = if (uri.toString()
-                                .startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())
-                        ) "image/*" else "video/*"
+                    if (pagerState.currentPage < lazyPagingItems.itemCount) {
+                        lazyPagingItems[pagerState.currentPage]?.let { image ->
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_STREAM, image.contentUri)
+                                type = if (image.contentUri.toString()
+                                        .startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())
+                                ) "image/*" else "video/*"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, null)
+                            context.startActivity(shareIntent)
+                        }
                     }
-                    val shareIntent = Intent.createChooser(sendIntent, null)
-                    context.startActivity(shareIntent)
                 },
                 showRestore = showRestore,
-                currentPage = pagerState.currentPage +1,
-                pagesCount = images.value.size
+                showShare = lazyPagingItems.itemCount > 0,
+                currentPage = if (lazyPagingItems.itemCount > 0) pagerState.currentPage + 1 else 0,
+                pagesCount = uiState.displayableImageCount
             )
         }
 
     ) { innerPadding ->
 
-        if (images.value.isEmpty()) {
+        if (lazyPagingItems.loadState.refresh is LoadState.Loading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+            return@Scaffold // 提前返回，下方的代码不会执行
+        }
+
+        if (lazyPagingItems.loadState.refresh is LoadState.Error) {
+            PlaceHolder(modifier = Modifier, stringResource = R.string.error_loading)
+            return@Scaffold // 提前返回
+        }
+
+        if (lazyPagingItems.itemCount == 0) {
             PlaceHolder(
                 modifier = Modifier, stringResource = R.string.congratulations
             )
@@ -218,8 +264,17 @@ fun ActionScreen(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = 64.dp),
             verticalAlignment = Alignment.CenterVertically,
-            pageSpacing = 16.dp
+            pageSpacing = 16.dp,
+            key = lazyPagingItems.itemKey {
+                Log.v("PAGING_DEBUG", "HorizontalPager generating UI for key: ${it.id}")
+                it.id }, // 提供稳定的Key
         ) { page ->
+            val currentImage = lazyPagingItems[page] ?: return@HorizontalPager
+
+            LaunchedEffect(currentImage.id) {
+                dragOffset = 0f
+                swipeScale = 1f
+            }
 
             Box(modifier = Modifier
                 .fillMaxSize()
@@ -284,29 +339,19 @@ fun ActionScreen(
                                     swipeScale = (1f - ((-dragOffset) / 2000f).coerceIn(0f, 1f))
                                 }
 
-
-                                if (images.value[pagerState.currentPage].isExcluded) {
+                                if (currentImage.isExcluded) {
                                     openExcludeDialog.value = true
                                 } else {
-
-                                    dragOffset = 0f
-                                    swipeScale = 1f
-
-                                    if (images.value.isNotEmpty()) {
-                                        val index = pagerState.currentPage
-                                        // if (pagerState.currentPage > 0) {
-                                        //     index -= 1
-                                        // }
-                                        viewModel.markImage(index)
-                                    }
+                                    visuallyRemovedItems.value += currentImage.id
+                                    viewModel.markImage(currentImage)
                                 }
                             }
                         } else {
                             if (dragOffset == 100f) {
-                                if (images.value[pagerState.currentPage].isExcluded) {
-                                    viewModel.includeMedia(images.value[pagerState.currentPage])
+                                if (currentImage.isExcluded) {
+                                    viewModel.includeMedia(currentImage)
                                 } else {
-                                    viewModel.excludeMedia(pagerState.currentPage)
+                                    viewModel.excludeMedia(currentImage)
                                 }
                             }
                             // Reset position and scale
@@ -325,13 +370,13 @@ fun ActionScreen(
                     }, onConfirmation = {
                         dragOffset = 0f
                         swipeScale = 1f
-                        viewModel.markImage(pagerState.currentPage)
+                        viewModel.markImage(currentImage)
                         openExcludeDialog.value = false
                     }, dialogText = stringResource(R.string.delete_excluded)
                     )
                 }
 
-                val uri = images.value[page].contentUri
+                val uri = currentImage.contentUri
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     data = uri
                 }
@@ -349,7 +394,7 @@ fun ActionScreen(
                             )
                         }
                     )
-                    if (images.value[page].isExcluded) {
+                    if (currentImage.isExcluded) {
                         IconButton(
                             onClick = {}, colors = IconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -48,6 +49,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import top.maary.oblivionis.R
 import top.maary.oblivionis.ui.PermissionBlock
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun WelcomeScreen(
