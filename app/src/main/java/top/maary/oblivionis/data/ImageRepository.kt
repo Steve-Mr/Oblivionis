@@ -351,37 +351,61 @@ class ImageRepository(
      * 从 MediaStore 查询指定相册的所有图片和视频.
      */
     private fun queryImagesFromMediaStore(albumPath: String): List<MediaEntity> {
-        val images = mutableListOf<MediaEntity>()
-        val uriList = listOf(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        )
+        val mediaList = mutableListOf<MediaEntity>()
+        // 1. 使用统一的 URI
+        val collection = MediaStore.Files.getContentUri("external")
+
+        // 2. 投影中增加 MEDIA_TYPE，用于区分图片和视频
         val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Files.FileColumns._ID,
+            MediaStore.Files.FileColumns.DISPLAY_NAME,
+            MediaStore.Files.FileColumns.DATE_ADDED,
+            MediaStore.Files.FileColumns.MEDIA_TYPE, // 新增
+            MediaStore.Files.FileColumns.RELATIVE_PATH // 使用 RELATIVE_PATH 进行筛选
         )
-        val selection = "${MediaStore.Images.ImageColumns.RELATIVE_PATH} like ?"
-        val selectionArgs = arrayOf("$albumPath/")
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
 
-        for (uri in uriList) {
-            contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)
-                ?.use { cursor ->
-                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-                    val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
-                    val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+        // 3. 在 selection 中同时筛选媒体类型和路径
+        val selection = """
+        (${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?)
+        AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} like ?
+    """.trimIndent()
 
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(idColumn)
-                        val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
-                        val displayName = cursor.getString(displayNameColumn)
-                        val contentUri = ContentUris.withAppendedId(uri, id)
-                        val image = MediaEntity(id, displayName, albumPath, dateAdded, contentUri)
-                        images += image
+        val selectionArgs = arrayOf(
+            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
+            "$albumPath/"
+        )
+
+        val sortOrder = "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
+
+        contentResolver.query(collection, projection, selection, selectionArgs, sortOrder)
+            ?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)
+                val mediaTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val displayName = cursor.getString(displayNameColumn)
+                    val dateAdded = Date(TimeUnit.SECONDS.toMillis(cursor.getLong(dateAddedColumn)))
+                    val mediaType = cursor.getInt(mediaTypeColumn)
+
+                    // 4. 根据媒体类型，构建正确的 Content URI
+                    val contentUri = when (mediaType) {
+                        MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE ->
+                            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                        MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO ->
+                            ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                        else -> continue // 忽略其他类型的文件
                     }
+
+                    val media = MediaEntity(id, displayName, albumPath, dateAdded, contentUri)
+                    mediaList += media
                 }
-        }
-        return images
+            }
+        // 注意这里返回的是一个未排序的列表，因为在外部调用它的 getImagesStream 中会进行排序。
+        // 如果需要，也可以在这里直接返回排序后的列表。
+        return mediaList
     }
 }
