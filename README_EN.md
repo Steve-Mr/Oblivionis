@@ -2,9 +2,14 @@
 
 > ようこそ。Ave Mujica の世界へ (Welcome to the world of Ave Mujica)
 
-This is an application designed to help you easily delete photos and videos. Whether it's screenshots, blurry photos, or files saved for various reasons, they are all part of our memories. Deleting these media files, in a sense, means losing the carriers of those memories. This reminded me of Ave Mujica's "Oblivionis," which also means "oblivion" or "forgetfulness."
+This is an application designed to help you easily delete photos and videos.  
 
-This application is heavily inspired by [Slidebox](http://slidebox.co/). I developed this not only as a personal practice project but also to create a similar tool that feels more like a native Android application in its design.
+Whether it's screenshots, blurry photos, or files saved for various reasons, they are all part of our memories.  
+Deleting these media files, in a sense, means losing the carriers of those memories.  
+This reminded me of Ave Mujica's "Oblivionis," which also means "oblivion" or "forgetfulness."  
+
+This application is heavily inspired by [Slidebox](http://slidebox.co/).  
+I developed this not only as a personal practice project but also to create a similar tool that feels more like a native Android application in its design.  
 
 | ![](assets/Screenshot_20240924-230507.png) | ![](assets/Screenshot_20240924-230519.png) | ![](assets/Screenshot_20240924-231504.png) |
 |:---:|:---:|:---:|
