@@ -230,6 +230,7 @@ fun ActionScreen(
                     }
                 },
                 showRestore = showRestore,
+                showShare = lazyPagingItems.itemCount > 0,
                 currentPage = if (lazyPagingItems.itemCount > 0) pagerState.currentPage + 1 else 0,
                 pagesCount = uiState.displayableImageCount
             )

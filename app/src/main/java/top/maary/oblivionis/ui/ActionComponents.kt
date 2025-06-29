@@ -149,6 +149,7 @@ fun ActionRow(
     onRollBackButtonClicked: () -> Unit,
     onShareButtonClicked: () -> Unit,
     showRestore: Boolean,
+    showShare: Boolean,
     currentPage: Int,
     pagesCount: Int
 ) {
@@ -259,20 +260,23 @@ fun ActionRow(
             }
         }
 
-        Button(
-            onClick = onShareButtonClicked,
-            enabled = true,
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier
-                .size(48.dp)
-                .align(Alignment.CenterEnd),
-            colors = ButtonDefaults.outlinedButtonColors()
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_share),
-                contentDescription = stringResource(R.string.share_media)
-            )
+        if (showShare) {
+
+            Button(
+                onClick = onShareButtonClicked,
+                enabled = true,
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .align(Alignment.CenterEnd),
+                colors = ButtonDefaults.outlinedButtonColors()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = stringResource(R.string.share_media)
+                )
+            }
         }
 
         if (showRestore) {
